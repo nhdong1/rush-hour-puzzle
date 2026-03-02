@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid 6x6</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(6, 50px);
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+        .grid-container input {
+            width: 50px;
+            height: 50px;
+            text-align: center;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .grid-container input:focus {
+            outline: 2px solid #007bff;
+            border-color: #007bff;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Step visualization */
+        .steps-container {
+            margin-top: 20px;
+        }
+        .step-wrapper {
+            display: inline-block;
+            margin: 10px;
+            vertical-align: top;
+        }
+        .step-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 40px);
+            gap: 2px;
+            border: 2px solid #333;
+            padding: 2px;
+            background: #333;
+        }
+        .step-cell {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            color: #fff;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+        }
+        .step-cell.empty {
+            background: #f0f0f0;
+        }
+        .step-cell.car-x {
+            background: #e74c3c;
+            color: white;
+        }
+        .exit-marker {
+            position: relative;
+        }
+        .exit-marker::after {
+            content: '→';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+            color: #27ae60;
+        }
+        .move-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            max-width: 200px;
+        }
+        .step-cell.highlight {
+            animation: pulse 0.8s ease-in-out infinite alternate;
+            box-shadow: 0 0 8px 3px rgba(255, 255, 0, 0.8);
+            border: 2px solid #fff;
+            z-index: 1;
+            position: relative;
+        }
+        @keyframes pulse {
+            from {
+                box-shadow: 0 0 8px 3px rgba(255, 255, 0, 0.8);
+            }
+            to {
+                box-shadow: 0 0 12px 5px rgba(255, 200, 0, 1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h2>Lưới Input 6x6 - Rush Hour Puzzle</h2>
+    <p>Nhập số xe (1-100) hoặc 'x' cho xe cần thoát. Xe 'x' phải nằm trên hàng 3. Lối thoát ở cuối hàng 3.</p>
+    <div class="grid-container" id="grid"></div>
+    <button id="btnReset">Giải Màn Khác</button>
+    <button id="btnSolve">Xem Cách Giải</button>
+    <button id="btnLoadExample">Lấy Ví Dụ</button>
+
+    <div id="result" style="margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px; display: none;">
+        <h3>Kết quả:</h3>
+        <pre id="solution" style="white-space: pre-wrap;"></pre>
+        <div class="steps-container" id="stepsContainer"></div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
