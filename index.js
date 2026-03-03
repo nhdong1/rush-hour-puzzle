@@ -42,6 +42,246 @@ for (let i = 0; i < ROWS; i++) {
     }
 }
 
+// ==================== DRAG AND DROP ====================
+
+let nextCarId = 1; // ID tự động cho xe mới
+let hasCarX = false; // Kiểm tra đã có xe X chưa
+
+// Hàm reset trạng thái kéo thả
+function resetDragDropState() {
+    nextCarId = 1;
+    hasCarX = false;
+    // Kiểm tra lại grid để cập nhật trạng thái
+    const grid = getArray2D();
+    for (let i = 0; i < ROWS; i++) {
+        for (let j = 0; j < COLS; j++) {
+            if (grid[i][j] === 'x') {
+                hasCarX = true;
+            }
+            if (typeof grid[i][j] === 'number' && grid[i][j] >= nextCarId) {
+                nextCarId = grid[i][j] + 1;
+            }
+        }
+    }
+    updateInputStyles();
+}
+
+// Cập nhật style cho các ô input dựa trên giá trị
+function updateInputStyles() {
+    const inputs = gridContainer.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.classList.remove('car-x', 'has-car');
+        const value = input.value.trim().toLowerCase();
+        if (value === 'x') {
+            input.classList.add('car-x', 'has-car');
+        } else if (value !== '') {
+            input.classList.add('has-car');
+            // Tạo màu nền cho xe dựa trên ID
+            const carId = parseInt(value);
+            if (!isNaN(carId)) {
+                input.style.backgroundColor = getCarColorForInput(carId);
+                input.style.color = 'white';
+            }
+        } else {
+            input.style.backgroundColor = '';
+            input.style.color = '';
+        }
+    });
+}
+
+// Màu cho các xe trong input grid
+function getCarColorForInput(carId) {
+    const colors = [
+        '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c',
+        '#e67e22', '#34495e', '#16a085', '#8e44ad', '#27ae60',
+        '#2980b9', '#d35400', '#c0392b', '#7f8c8d', '#f1c40f'
+    ];
+    return colors[(carId - 1) % colors.length];
+}
+
+// Kiểm tra có thể đặt xe vào vị trí không
+function canPlaceCar(startRow, startCol, size, orientation) {
+    const grid = getArray2D();
+
+    if (orientation === 'H') {
+        if (startCol + size > COLS) return false;
+        for (let i = 0; i < size; i++) {
+            if (grid[startRow][startCol + i] !== null) return false;
+        }
+    } else {
+        if (startRow + size > ROWS) return false;
+        for (let i = 0; i < size; i++) {
+            if (grid[startRow + i][startCol] !== null) return false;
+        }
+    }
+    return true;
+}
+
+// Đặt xe vào grid
+function placeCar(startRow, startCol, size, orientation, carType) {
+    const inputs = gridContainer.querySelectorAll('input');
+    let carValue;
+
+    if (carType === 'x') {
+        carValue = 'x';
+        hasCarX = true;
+    } else {
+        carValue = nextCarId;
+        nextCarId++;
+    }
+
+    if (orientation === 'H') {
+        for (let i = 0; i < size; i++) {
+            const index = startRow * COLS + (startCol + i);
+            inputs[index].value = carValue;
+        }
+    } else {
+        for (let i = 0; i < size; i++) {
+            const index = (startRow + i) * COLS + startCol;
+            inputs[index].value = carValue;
+        }
+    }
+
+    updateInputStyles();
+}
+
+// Thiết lập drag events cho các xe trong palette
+document.querySelectorAll('.draggable-car').forEach(car => {
+    car.addEventListener('dragstart', function(e) {
+        const type = this.dataset.type;
+        const size = parseInt(this.dataset.size);
+        const orientation = this.dataset.orientation;
+
+        // Không cho kéo xe X nếu đã có
+        if (type === 'x' && hasCarX) {
+            e.preventDefault();
+            alert('Chỉ được phép có 1 xe X trên lưới!');
+            return;
+        }
+
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+            type, size, orientation
+        }));
+        e.dataTransfer.effectAllowed = 'copy';
+        this.style.opacity = '0.5';
+    });
+
+    car.addEventListener('dragend', function(e) {
+        this.style.opacity = '1';
+        // Xóa các class highlight
+        document.querySelectorAll('.grid-container input').forEach(input => {
+            input.classList.remove('drag-over', 'drag-invalid');
+        });
+    });
+});
+
+// Thiết lập drop events cho các ô input
+function setupDropZones() {
+    const inputs = gridContainer.querySelectorAll('input');
+
+    inputs.forEach(input => {
+        input.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        input.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            const row = parseInt(this.dataset.row);
+            const col = parseInt(this.dataset.col);
+
+            try {
+                // Không thể đọc data trong dragenter, chỉ highlight
+                this.classList.add('drag-over');
+            } catch (err) {
+                this.classList.add('drag-over');
+            }
+        });
+
+        input.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over', 'drag-invalid');
+        });
+
+        input.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over', 'drag-invalid');
+
+            const row = parseInt(this.dataset.row);
+            const col = parseInt(this.dataset.col);
+
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                const { type, size, orientation } = data;
+
+                // Xe X chỉ được đặt ở hàng 3 (index 2)
+                if (type === 'x' && row !== 2) {
+                    alert('Xe X (đỏ) chỉ được đặt ở hàng 3!');
+                    return;
+                }
+
+                // Kiểm tra có thể đặt không
+                if (!canPlaceCar(row, col, size, orientation)) {
+                    alert('Không thể đặt xe ở vị trí này! Kiểm tra xem có đủ chỗ trống không.');
+                    return;
+                }
+
+                // Đặt xe
+                placeCar(row, col, size, orientation, type);
+
+            } catch (err) {
+                console.error('Drop error:', err);
+            }
+        });
+
+        // Cập nhật style khi input thay đổi
+        input.addEventListener('input', function() {
+            setTimeout(updateInputStyles, 0);
+        });
+    });
+}
+
+// Khởi tạo drop zones
+setupDropZones();
+
+// Xóa xe khi click chuột phải
+gridContainer.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    const input = e.target;
+    if (input.tagName !== 'INPUT') return;
+
+    const value = input.value.trim();
+    if (value === '') return;
+
+    // Tìm tất cả các ô có cùng giá trị và xóa
+    const inputs = gridContainer.querySelectorAll('input');
+    inputs.forEach(inp => {
+        if (inp.value.trim() === value) {
+            inp.value = '';
+        }
+    });
+
+    // Nếu xóa xe X
+    if (value.toLowerCase() === 'x') {
+        hasCarX = false;
+    }
+
+    updateInputStyles();
+});
+
+// Cập nhật resetDragDropState khi reset
+const originalResetHandler = document.getElementById('btnReset').onclick;
+document.getElementById('btnReset').addEventListener('click', function() {
+    setTimeout(resetDragDropState, 0);
+});
+
+// Cập nhật khi load ví dụ
+document.getElementById('btnLoadExample').addEventListener('click', function() {
+    setTimeout(resetDragDropState, 100);
+});
+
+// Khởi tạo ban đầu
+setTimeout(resetDragDropState, 0);
+
 // Lấy array 2D từ grid
 function getArray2D() {
     const inputs = gridContainer.querySelectorAll('input');
