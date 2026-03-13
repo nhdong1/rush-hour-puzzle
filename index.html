@@ -811,6 +811,61 @@
       .btn-warning:hover {
         background: #e0a800;
       }
+      .btn-info {
+        background: #17a2b8;
+      }
+      .btn-info:hover {
+        background: #138496;
+      }
+      /* Suggest Result Styles */
+      .suggest-result-content {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        border: 2px solid #17a2b8;
+      }
+      .suggest-header {
+        font-weight: bold;
+        color: #17a2b8;
+        margin-bottom: 10px;
+      }
+      .suggest-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .suggest-item:last-child {
+        border-bottom: none;
+      }
+      .suggest-add {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+      .suggest-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        color: white;
+        font-size: 14px;
+      }
+      .suggest-chip.num {
+        background: #3498db;
+      }
+      .suggest-chip.op {
+        background: #e67e22;
+      }
+      .suggest-improvement {
+        color: #28a745;
+        font-weight: bold;
+      }
+      .suggest-no-improvement {
+        color: #6c757d;
+      }
     </style>
   </head>
   <body>
@@ -1062,6 +1117,36 @@
               />
             </div>
           </div>
+        </div>
+
+        <!-- Suggest Section -->
+        <div class="math-section" id="suggest-section" style="display: none">
+          <h3>💡 Gợi ý thêm số/phép tính</h3>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 15px;
+              flex-wrap: wrap;
+            "
+          >
+            <div class="req-item" style="flex: 0 0 auto">
+              <label>Số lượng có thể thêm (số hoặc phép tính):</label>
+              <input
+                type="number"
+                id="suggest-extra-total"
+                value="1"
+                min="1"
+                max="10"
+                style="width: 80px"
+              />
+            </div>
+            <button id="btnMathSuggest" class="btn-info">Gợi Ý</button>
+          </div>
+          <div
+            id="suggest-result"
+            style="display: none; margin-top: 15px"
+          ></div>
         </div>
 
         <!-- Buttons -->

@@ -12,6 +12,26 @@ let gameState = {
     targetResult: 22
 };
 
+// ==================== URL PARAMS ====================
+
+function getUrlParam(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
+}
+
+function shouldShowSuggest() {
+    return getUrlParam('showSuggest') === '1';
+}
+
+function shouldShowRemaining() {
+    return getUrlParam('showRemaining') === '1';
+}
+
+function formatOperatorForDisplay(op) {
+    const displayMap = { '*': '×', '/': '÷' };
+    return displayMap[op] || op;
+}
+
 // ==================== INITIALIZATION ====================
 
 export function initMathPuzzle() {
@@ -20,6 +40,14 @@ export function initMathPuzzle() {
     setupRequirementInputs();
     setupButtons();
     updateExpressionSlots();
+
+    // Show suggest section if URL param is set
+    if (shouldShowSuggest()) {
+        const suggestSection = document.getElementById('suggest-section');
+        if (suggestSection) {
+            suggestSection.style.display = 'block';
+        }
+    }
 }
 
 function setupNumberInputs() {
@@ -435,44 +463,302 @@ function displaySolutions(result) {
     result.solutions.forEach((sol, index) => {
         const item = document.createElement('div');
         item.className = 'solution-item';
+        // Format expression with proper symbols
+        const formattedExpr = sol.expression.replace(/\*/g, '×').replace(/\//g, '÷');
         item.innerHTML = `
             <span class="solution-index">${index + 1}.</span>
-            <span class="solution-expr">${sol.expression} = ${gameState.targetResult}</span>
+            <span class="solution-expr">${formattedExpr} = ${gameState.targetResult}</span>
         `;
         list.appendChild(item);
 
-        // Show remaining resources after this solution
-        const remainingDiv = document.createElement('div');
-        remainingDiv.className = 'remaining-resources';
-        remainingDiv.innerHTML = '<span class="remaining-label">Còn lại:</span>';
+        // Show remaining resources after this solution (only if URL param is set)
+        if (shouldShowRemaining()) {
+            const remainingDiv = document.createElement('div');
+            remainingDiv.className = 'remaining-resources';
+            remainingDiv.innerHTML = '<span class="remaining-label">Còn lại:</span>';
 
-        // Number chips
-        const numChips = document.createElement('span');
-        numChips.className = 'remaining-chips';
-        for (let i = 0; i <= 9; i++) {
-            const count = sol.remainingNums[i];
-            if (count > 0) {
-                numChips.innerHTML += `<span class="chip-mini chip-number">${i}<sup>${count}</sup></span>`;
+            // Number chips
+            const numChips = document.createElement('span');
+            numChips.className = 'remaining-chips';
+            for (let i = 0; i <= 9; i++) {
+                const count = sol.remainingNums[i];
+                if (count > 0) {
+                    numChips.innerHTML += `<span class="chip-mini chip-number">${i}<sup>${count}</sup></span>`;
+                }
             }
+            remainingDiv.appendChild(numChips);
+
+            // Operator chips
+            const opChips = document.createElement('span');
+            opChips.className = 'remaining-chips';
+            const ops = ['+', '-', '*', '/'];
+            ops.forEach(op => {
+                const count = sol.remainingOps[op];
+                if (count > 0) {
+                    opChips.innerHTML += `<span class="chip-mini chip-operator">${formatOperatorForDisplay(op)}<sup>${count}</sup></span>`;
+                }
+            });
+            remainingDiv.appendChild(opChips);
+
+            list.appendChild(remainingDiv);
         }
-        remainingDiv.appendChild(numChips);
-
-        // Operator chips
-        const opChips = document.createElement('span');
-        opChips.className = 'remaining-chips';
-        const ops = ['+', '-', '*', '/'];
-        ops.forEach(op => {
-            const count = sol.remainingOps[op];
-            if (count > 0) {
-                opChips.innerHTML += `<span class="chip-mini chip-operator">${op}<sup>${count}</sup></span>`;
-            }
-        });
-        remainingDiv.appendChild(opChips);
-
-        list.appendChild(remainingDiv);
     });
 
     container.appendChild(list);
+}
+
+// ==================== SUGGEST FEATURE ====================
+
+async function suggestBestAdditions(extraTotal) {
+    // Get current baseline result
+    const baselineResult = await solvePuzzleWithState(gameState.numbers, gameState.operators);
+    const baselineCount = baselineResult.success ? baselineResult.maxCorrect : 0;
+
+    if (extraTotal <= 0) {
+        return {
+            baseline: baselineCount,
+            suggestions: [],
+            message: 'Vui lòng nhập số lượng muốn thêm!'
+        };
+    }
+
+    const allNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const allOperators = ['+', '-', '*', '/'];
+    const allItems = [...allNumbers.map(n => ({ type: 'num', value: n })),
+    ...allOperators.map(op => ({ type: 'op', value: op }))];
+
+    // Generate all possible combinations of items to add
+    const suggestions = [];
+    const itemCombinations = generateAdditionCombinations(allItems, extraTotal);
+
+    // Limit total combinations to avoid performance issues
+    const maxCombinations = 500;
+    let testedCount = 0;
+
+    for (const combo of itemCombinations) {
+        if (testedCount >= maxCombinations) break;
+        testedCount++;
+
+        // Create modified state
+        const modifiedNums = { ...gameState.numbers };
+        const modifiedOps = { ...gameState.operators };
+        const addedNumbers = [];
+        const addedOperators = [];
+
+        // Add items
+        for (const item of combo) {
+            if (item.type === 'num') {
+                modifiedNums[item.value]++;
+                addedNumbers.push(item.value);
+            } else {
+                modifiedOps[item.value]++;
+                addedOperators.push(item.value);
+            }
+        }
+
+        // Solve with modified state
+        const result = await solvePuzzleWithState(modifiedNums, modifiedOps);
+        const count = result.success ? result.maxCorrect : 0;
+
+        if (count > baselineCount) {
+            suggestions.push({
+                addedNumbers,
+                addedOperators,
+                resultCount: count,
+                improvement: count - baselineCount
+            });
+        }
+    }
+
+    // Sort by improvement (descending)
+    suggestions.sort((a, b) => b.improvement - a.improvement ||
+        (a.addedNumbers.length + a.addedOperators.length) - (b.addedNumbers.length + b.addedOperators.length));
+
+    // Keep top 5 unique suggestions
+    const uniqueSuggestions = [];
+    const seen = new Set();
+    for (const sug of suggestions) {
+        const key = JSON.stringify([sug.addedNumbers.sort(), sug.addedOperators.sort()]);
+        if (!seen.has(key)) {
+            seen.add(key);
+            uniqueSuggestions.push(sug);
+            if (uniqueSuggestions.length >= 5) break;
+        }
+    }
+
+    return {
+        baseline: baselineCount,
+        suggestions: uniqueSuggestions,
+        testedCombinations: testedCount,
+        message: uniqueSuggestions.length > 0
+            ? `Tìm thấy ${uniqueSuggestions.length} gợi ý tốt nhất!`
+            : 'Không tìm thấy cách thêm nào cải thiện kết quả.'
+    };
+}
+
+function generateAdditionCombinations(items, count) {
+    if (count === 0) return [[]];
+
+    const result = [];
+
+    function backtrack(start, current) {
+        if (current.length === count) {
+            result.push([...current]);
+            return;
+        }
+
+        for (let i = start; i < items.length; i++) {
+            current.push(items[i]);
+            backtrack(i, current); // Allow same item multiple times
+            current.pop();
+        }
+    }
+
+    backtrack(0, []);
+    return result;
+}
+
+async function solvePuzzleWithState(numbers, operators) {
+    // Build arrays from resources
+    const numsArray = [];
+    const opsArray = [];
+
+    for (let i = 0; i <= 9; i++) {
+        for (let j = 0; j < numbers[i]; j++) {
+            numsArray.push(i);
+        }
+    }
+
+    const ops = ['+', '-', '*', '/'];
+    ops.forEach(op => {
+        for (let j = 0; j < operators[op]; j++) {
+            opsArray.push(op);
+        }
+    });
+
+    // Check if we have enough resources
+    if (numsArray.length < gameState.numDigits || opsArray.length < gameState.numOperators) {
+        return { success: false, maxCorrect: 0 };
+    }
+
+    // Find all valid expressions
+    const validExpressions = [];
+    const seen = new Set();
+
+    const numCombinations = getCombinations(numsArray, gameState.numDigits);
+    const opCombinations = getCombinations(opsArray, gameState.numOperators);
+
+    outer:
+    for (const numCombo of numCombinations) {
+        const numPerms = getUniquePermutations(numCombo);
+
+        for (const nums of numPerms) {
+            for (const opCombo of opCombinations) {
+                const opPerms = getUniquePermutations(opCombo);
+
+                for (const opsArr of opPerms) {
+                    const expr = [];
+                    for (let i = 0; i < nums.length; i++) {
+                        expr.push({ value: nums[i], type: 'number' });
+                        if (i < opsArr.length) {
+                            expr.push({ value: opsArr[i], type: 'operator' });
+                        }
+                    }
+
+                    const exprStr = expr.map(e => e.value).join(' ');
+                    if (seen.has(exprStr)) continue;
+                    seen.add(exprStr);
+
+                    const result = evaluateExpression(expr);
+
+                    if (result === gameState.targetResult) {
+                        validExpressions.push({
+                            expression: exprStr,
+                            numbers: [...nums],
+                            operators: [...opsArr]
+                        });
+
+                        if (validExpressions.length >= SOLVER_CONFIG.maxExpressions) {
+                            break outer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (validExpressions.length === 0) {
+        return { success: false, maxCorrect: 0 };
+    }
+
+    // Find maximal set
+    const bestSet = findMaximalExpressionSet(validExpressions, numbers, operators);
+
+    return {
+        success: true,
+        maxCorrect: bestSet.length
+    };
+}
+
+function displaySuggestions(result) {
+    const container = document.getElementById('suggest-result');
+    if (!container) return;
+
+    container.style.display = 'block';
+    container.innerHTML = '';
+
+    const content = document.createElement('div');
+    content.className = 'suggest-result-content';
+
+    // Header with baseline
+    const header = document.createElement('div');
+    header.className = 'suggest-header';
+    header.innerHTML = `📊 Kết quả hiện tại: <strong>${result.baseline}</strong> phép tính đúng`;
+    content.appendChild(header);
+
+    if (result.suggestions.length === 0) {
+        const noResult = document.createElement('div');
+        noResult.className = 'suggest-no-improvement';
+        noResult.innerHTML = result.message;
+        content.appendChild(noResult);
+    } else {
+        const sugList = document.createElement('div');
+
+        result.suggestions.forEach((sug, index) => {
+            const item = document.createElement('div');
+            item.className = 'suggest-item';
+
+            // Build add chips
+            let addHtml = '<div class="suggest-add">';
+
+            if (sug.addedNumbers.length > 0) {
+                addHtml += '<span>Thêm số: </span>';
+                sug.addedNumbers.forEach(n => {
+                    addHtml += `<span class="suggest-chip num">${n}</span>`;
+                });
+            }
+
+            if (sug.addedOperators.length > 0) {
+                addHtml += '<span style="margin-left: 10px;">Thêm phép: </span>';
+                sug.addedOperators.forEach(op => {
+                    addHtml += `<span class="suggest-chip op">${formatOperatorForDisplay(op)}</span>`;
+                });
+            }
+
+            addHtml += '</div>';
+
+            item.innerHTML = `
+                <span class="solution-index">${index + 1}.</span>
+                ${addHtml}
+                <span class="suggest-improvement">→ ${sug.resultCount} phép tính (+${sug.improvement})</span>
+            `;
+            sugList.appendChild(item);
+        });
+
+        content.appendChild(sugList);
+    }
+
+    container.appendChild(content);
 }
 
 // ==================== FEEDBACK ====================
@@ -496,6 +782,7 @@ function setupButtons() {
     const btnReset = document.getElementById('btnMathReset');
     const btnSolve = document.getElementById('btnMathSolve');
     const btnExample = document.getElementById('btnMathExample');
+    const btnSuggest = document.getElementById('btnMathSuggest');
 
     if (btnReset) {
         btnReset.addEventListener('click', resetGame);
@@ -524,6 +811,27 @@ function setupButtons() {
 
     if (btnExample) {
         btnExample.addEventListener('click', loadExample);
+    }
+
+    if (btnSuggest) {
+        btnSuggest.addEventListener('click', async () => {
+            btnSuggest.disabled = true;
+            btnSuggest.textContent = 'Đang tính...';
+
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            try {
+                const extraTotal = parseInt(document.getElementById('suggest-extra-total').value) || 1;
+                const result = await suggestBestAdditions(extraTotal);
+                displaySuggestions(result);
+            } catch (error) {
+                console.error('Suggest error:', error);
+                showFeedback('Có lỗi xảy ra khi tính gợi ý!', 'error');
+            } finally {
+                btnSuggest.disabled = false;
+                btnSuggest.textContent = 'Gợi Ý';
+            }
+        });
     }
 }
 
