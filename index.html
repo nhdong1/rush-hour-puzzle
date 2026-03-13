@@ -202,6 +202,9 @@
         transition:
           transform 0.2s,
           box-shadow 0.2s;
+        -webkit-user-select: none;
+        user-select: none;
+        touch-action: none;
       }
       .draggable-car:hover {
         transform: scale(1.05);
@@ -644,6 +647,28 @@
           padding: 15px;
         }
 
+        /* Rush Hour Mobile */
+        .car-palette {
+          max-width: 100%;
+          padding: 12px;
+        }
+        .palette-row {
+          gap: 12px;
+        }
+        .draggable-car span {
+          width: 35px;
+          height: 35px;
+        }
+        .grid-container {
+          grid-template-columns: repeat(6, 45px);
+          gap: 3px;
+        }
+        .grid-container input {
+          width: 45px;
+          height: 45px;
+          font-size: 14px;
+        }
+
         /* Math Puzzle Mobile */
         .math-container {
           max-width: 100%;
@@ -713,6 +738,29 @@
       }
 
       @media (max-width: 400px) {
+        /* Rush Hour very small screens */
+        .grid-container {
+          grid-template-columns: repeat(6, 40px);
+          gap: 2px;
+        }
+        .grid-container input {
+          width: 40px;
+          height: 40px;
+          font-size: 12px;
+        }
+        .draggable-car span {
+          width: 30px;
+          height: 30px;
+          font-size: 12px;
+        }
+        .palette-row {
+          gap: 8px;
+        }
+        .section-label {
+          font-size: 11px;
+        }
+
+        /* Math Puzzle very small screens */
         .numbers-grid {
           grid-template-columns: 1fr 1fr;
         }

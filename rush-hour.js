@@ -161,6 +161,123 @@ function placeCar(startRow, startCol, size, orientation, carType) {
     updateInputStyles();
 }
 
+// ==================== TOUCH DRAG AND DROP ====================
+
+let touchDragData = null;
+let touchDragElement = null;
+let touchClone = null;
+
+function setupTouchDragAndDrop() {
+    document.querySelectorAll('.draggable-car').forEach(car => {
+        car.addEventListener('touchstart', handleTouchStart, { passive: false });
+    });
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchCancel);
+}
+
+function handleTouchStart(e) {
+    const car = e.currentTarget;
+    const type = car.dataset.type;
+    const size = parseInt(car.dataset.size);
+    const orientation = car.dataset.orientation;
+
+    if (type === 'x' && hasCarX) {
+        alert('Chỉ được phép có 1 xe X trên lưới!');
+        return;
+    }
+
+    e.preventDefault();
+
+    touchDragData = { type, size, orientation };
+    touchDragElement = car;
+    car.style.opacity = '0.5';
+
+    // Create a clone to follow finger
+    touchClone = car.cloneNode(true);
+    touchClone.style.position = 'fixed';
+    touchClone.style.pointerEvents = 'none';
+    touchClone.style.zIndex = '9999';
+    touchClone.style.opacity = '0.8';
+    touchClone.style.transform = 'scale(0.9)';
+    document.body.appendChild(touchClone);
+
+    const touch = e.touches[0];
+    positionTouchClone(touch.clientX, touch.clientY);
+}
+
+function positionTouchClone(x, y) {
+    if (!touchClone) return;
+    const rect = touchClone.getBoundingClientRect();
+    touchClone.style.left = (x - rect.width / 2) + 'px';
+    touchClone.style.top = (y - rect.height / 2) + 'px';
+}
+
+function handleTouchMove(e) {
+    if (!touchDragData || !touchClone) return;
+
+    e.preventDefault();
+    const touch = e.touches[0];
+    positionTouchClone(touch.clientX, touch.clientY);
+
+    // Highlight the target cell
+    const inputs = gridContainer.querySelectorAll('input');
+    inputs.forEach(input => input.classList.remove('drag-over'));
+
+    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (targetElement && targetElement.tagName === 'INPUT' && gridContainer.contains(targetElement)) {
+        targetElement.classList.add('drag-over');
+    }
+}
+
+function handleTouchEnd(e) {
+    if (!touchDragData) return;
+
+    // Find the element under the last touch
+    const touch = e.changedTouches[0];
+    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    cleanupTouchDrag();
+
+    if (targetElement && targetElement.tagName === 'INPUT' && gridContainer.contains(targetElement)) {
+        const row = parseInt(targetElement.dataset.row);
+        const col = parseInt(targetElement.dataset.col);
+        const { type, size, orientation } = touchDragData;
+
+        if (type === 'x' && row !== 2) {
+            alert('Xe X (đỏ) chỉ được đặt ở hàng 3!');
+        } else if (!canPlaceCar(row, col, size, orientation)) {
+            alert('Không thể đặt xe ở vị trí này! Kiểm tra xem có đủ chỗ trống không.');
+        } else {
+            placeCar(row, col, size, orientation, type);
+        }
+    }
+
+    touchDragData = null;
+}
+
+function handleTouchCancel() {
+    cleanupTouchDrag();
+    touchDragData = null;
+}
+
+function cleanupTouchDrag() {
+    if (touchDragElement) {
+        touchDragElement.style.opacity = '1';
+        touchDragElement = null;
+    }
+    if (touchClone && touchClone.parentNode) {
+        touchClone.parentNode.removeChild(touchClone);
+        touchClone = null;
+    }
+    gridContainer.querySelectorAll('input').forEach(input => {
+        input.classList.remove('drag-over', 'drag-invalid');
+    });
+}
+
+// ==================== DESKTOP DRAG AND DROP ====================
+
 function setupDragAndDrop() {
     document.querySelectorAll('.draggable-car').forEach(car => {
         car.addEventListener('dragstart', function (e) {
@@ -188,6 +305,9 @@ function setupDragAndDrop() {
             });
         });
     });
+
+    // Setup touch drag and drop for mobile
+    setupTouchDragAndDrop();
 }
 
 function setupDropZones() {
