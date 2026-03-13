@@ -30,6 +30,19 @@ function setupNumberInputs() {
             input.addEventListener('change', function () {
                 gameState.numbers[i] = parseInt(this.value) || 0;
             });
+            // Clear 0 on focus, restore if empty on blur
+            input.addEventListener('focus', function () {
+                if (this.value === '0') {
+                    this.value = '';
+                }
+                this.select();
+            });
+            input.addEventListener('blur', function () {
+                if (this.value === '') {
+                    this.value = '0';
+                    gameState.numbers[i] = 0;
+                }
+            });
         }
     }
 }
@@ -44,6 +57,19 @@ function setupOperatorInputs() {
             input.value = gameState.operators[op];
             input.addEventListener('change', function () {
                 gameState.operators[op] = parseInt(this.value) || 0;
+            });
+            // Clear 0 on focus, restore if empty on blur
+            input.addEventListener('focus', function () {
+                if (this.value === '0') {
+                    this.value = '';
+                }
+                this.select();
+            });
+            input.addEventListener('blur', function () {
+                if (this.value === '') {
+                    this.value = '0';
+                    gameState.operators[op] = 0;
+                }
             });
         }
     });
