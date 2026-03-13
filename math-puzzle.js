@@ -170,71 +170,44 @@ function evaluateExpression(expr) {
 
 // ==================== SOLVER ====================
 
-function solvePuzzle() {
-    // Clone available resources
-    const availableNums = { ...gameState.numbers };
-    const availableOps = { ...gameState.operators };
+const SOLVER_CONFIG = {
+    maxExpressions: 10000,      // Giới hạn số biểu thức tìm được
+    maxBacktrackIterations: 100000  // Giới hạn số bước backtrack
+};
 
-    const solutions = [];
-    const maxIterations = 1000; // Safety limit
-    let iterations = 0;
+async function solvePuzzle() {
+    // Step 1: Find ALL valid expressions (with limit)
+    const allValidExpressions = findAllValidExpressions();
 
-    while (iterations < maxIterations) {
-        iterations++;
-
-        // Build arrays from remaining resources
-        const numsArray = [];
-        const opsArray = [];
-
-        for (let i = 0; i <= 9; i++) {
-            for (let j = 0; j < availableNums[i]; j++) {
-                numsArray.push(i);
-            }
-        }
-
-        const ops = ['+', '-', '*', '/'];
-        ops.forEach(op => {
-            for (let j = 0; j < availableOps[op]; j++) {
-                opsArray.push(op);
-            }
-        });
-
-        // Check if we have enough resources
-        if (numsArray.length < gameState.numDigits) {
-            break; // Not enough numbers left
-        }
-        if (opsArray.length < gameState.numOperators) {
-            break; // Not enough operators left
-        }
-
-        // Try to find one valid solution
-        const solution = findOneSolution(numsArray, opsArray);
-
-        if (!solution) {
-            break; // No more solutions possible
-        }
-
-        solutions.push(solution);
-
-        // Deduct used resources
-        solution.numbers.forEach(num => {
-            availableNums[num]--;
-        });
-        solution.operators.forEach(op => {
-            availableOps[op]--;
-        });
-
-        // Store remaining resources after this solution
-        solution.remainingNums = { ...availableNums };
-        solution.remainingOps = { ...availableOps };
-    }
-
-    if (solutions.length === 0) {
+    if (allValidExpressions.length === 0) {
         return {
             success: false,
             maxCorrect: 0,
             message: 'Không tìm được lời giải nào với các số và phép tính hiện có!'
         };
+    }
+
+    // Step 2: Use backtracking to find the maximum set of non-overlapping expressions
+    const availableNums = { ...gameState.numbers };
+    const availableOps = { ...gameState.operators };
+
+    const bestSet = findMaximalExpressionSet(allValidExpressions, availableNums, availableOps);
+
+    // Calculate remaining resources for each solution in the set
+    const solutions = [];
+    const runningNums = { ...gameState.numbers };
+    const runningOps = { ...gameState.operators };
+
+    for (const sol of bestSet) {
+        // Deduct used resources
+        sol.numbers.forEach(num => runningNums[num]--);
+        sol.operators.forEach(op => runningOps[op]--);
+
+        solutions.push({
+            ...sol,
+            remainingNums: { ...runningNums },
+            remainingOps: { ...runningOps }
+        });
     }
 
     return {
@@ -245,79 +218,196 @@ function solvePuzzle() {
     };
 }
 
-function findOneSolution(numsArray, opsArray) {
-    // Generate all permutations
-    const numCombinations = getPermutations(numsArray, gameState.numDigits);
-    const opCombinations = getPermutations(opsArray, gameState.numOperators);
+function findAllValidExpressions() {
+    // Build arrays from all available resources
+    const numsArray = [];
+    const opsArray = [];
 
+    for (let i = 0; i <= 9; i++) {
+        for (let j = 0; j < gameState.numbers[i]; j++) {
+            numsArray.push(i);
+        }
+    }
+
+    const ops = ['+', '-', '*', '/'];
+    ops.forEach(op => {
+        for (let j = 0; j < gameState.operators[op]; j++) {
+            opsArray.push(op);
+        }
+    });
+
+    // Check if we have enough resources
+    if (numsArray.length < gameState.numDigits || opsArray.length < gameState.numOperators) {
+        return [];
+    }
+
+    const validExpressions = [];
     const seen = new Set();
 
-    for (const nums of numCombinations) {
-        for (const opsArr of opCombinations) {
-            // Build expression
-            const expr = [];
-            for (let i = 0; i < nums.length; i++) {
-                expr.push({ value: nums[i], type: 'number' });
-                if (i < opsArr.length) {
-                    expr.push({ value: opsArr[i], type: 'operator' });
+    // Generate unique combinations (not permutations) first, then permute
+    const numCombinations = getCombinations(numsArray, gameState.numDigits);
+    const opCombinations = getCombinations(opsArray, gameState.numOperators);
+
+    outer:
+    for (const numCombo of numCombinations) {
+        // Get all permutations of this combination
+        const numPerms = getUniquePermutations(numCombo);
+
+        for (const nums of numPerms) {
+            for (const opCombo of opCombinations) {
+                const opPerms = getUniquePermutations(opCombo);
+
+                for (const opsArr of opPerms) {
+                    // Build expression
+                    const expr = [];
+                    for (let i = 0; i < nums.length; i++) {
+                        expr.push({ value: nums[i], type: 'number' });
+                        if (i < opsArr.length) {
+                            expr.push({ value: opsArr[i], type: 'operator' });
+                        }
+                    }
+
+                    // Create string representation
+                    const exprStr = expr.map(e => e.value).join(' ');
+
+                    // Skip duplicates
+                    if (seen.has(exprStr)) continue;
+                    seen.add(exprStr);
+
+                    // Evaluate
+                    const result = evaluateExpression(expr);
+
+                    if (result === gameState.targetResult) {
+                        validExpressions.push({
+                            expression: exprStr,
+                            numbers: [...nums],
+                            operators: [...opsArr]
+                        });
+
+                        // Limit number of expressions
+                        if (validExpressions.length >= SOLVER_CONFIG.maxExpressions) {
+                            break outer;
+                        }
+                    }
                 }
-            }
-
-            // Create string representation
-            const exprStr = expr.map(e => e.value).join(' ');
-
-            // Skip duplicates
-            if (seen.has(exprStr)) continue;
-            seen.add(exprStr);
-
-            // Evaluate
-            const result = evaluateExpression(expr);
-
-            if (result === gameState.targetResult) {
-                return {
-                    expression: exprStr,
-                    numbers: [...nums],
-                    operators: [...opsArr]
-                };
             }
         }
     }
 
-    return null; // No solution found
+    return validExpressions;
 }
 
-function getPermutations(arr, length) {
-    if (length === 0) return [[]];
-    if (arr.length === 0) return [];
-
+function getCombinations(arr, length) {
+    // Get unique combinations (order doesn't matter, no duplicates)
     const result = [];
-    const used = new Array(arr.length).fill(false);
+    const seen = new Set();
 
-    function backtrack(current) {
+    function backtrack(start, current) {
         if (current.length === length) {
-            result.push([...current]);
+            const key = [...current].sort().join(',');
+            if (!seen.has(key)) {
+                seen.add(key);
+                result.push([...current]);
+            }
             return;
         }
 
-        for (let i = 0; i < arr.length; i++) {
-            if (used[i]) continue;
-
-            // Skip duplicates
-            if (i > 0 && arr[i] === arr[i - 1] && !used[i - 1]) continue;
-
-            used[i] = true;
+        for (let i = start; i < arr.length; i++) {
             current.push(arr[i]);
-            backtrack(current);
+            backtrack(i + 1, current);
             current.pop();
-            used[i] = false;
         }
     }
 
-    // Sort for duplicate detection
-    const sorted = [...arr].sort();
-    backtrack([]);
-
+    backtrack(0, []);
     return result;
+}
+
+function getUniquePermutations(arr) {
+    // Get all unique permutations of an array
+    const result = [];
+    const seen = new Set();
+
+    function permute(current, remaining) {
+        if (remaining.length === 0) {
+            const key = current.join(',');
+            if (!seen.has(key)) {
+                seen.add(key);
+                result.push([...current]);
+            }
+            return;
+        }
+
+        for (let i = 0; i < remaining.length; i++) {
+            current.push(remaining[i]);
+            const newRemaining = [...remaining.slice(0, i), ...remaining.slice(i + 1)];
+            permute(current, newRemaining);
+            current.pop();
+        }
+    }
+
+    permute([], arr);
+    return result;
+}
+
+function findMaximalExpressionSet(allExpressions, availableNums, availableOps) {
+    let bestSet = [];
+    let iterations = 0;
+
+    function canUseExpression(expr, nums, ops) {
+        // Check if we have enough resources for this expression
+        const tempNums = { ...nums };
+        const tempOps = { ...ops };
+
+        for (const n of expr.numbers) {
+            if (tempNums[n] <= 0) return null;
+            tempNums[n]--;
+        }
+
+        for (const o of expr.operators) {
+            if (tempOps[o] <= 0) return null;
+            tempOps[o]--;
+        }
+
+        return { tempNums, tempOps };
+    }
+
+    function backtrack(index, currentSet, nums, ops) {
+        iterations++;
+
+        // Stop if too many iterations
+        if (iterations >= SOLVER_CONFIG.maxBacktrackIterations) {
+            return;
+        }
+
+        // Update best if current is better
+        if (currentSet.length > bestSet.length) {
+            bestSet = currentSet.map(expr => ({ ...expr }));
+        }
+
+        // Pruning: if remaining expressions can't beat the best, stop
+        const remainingExpressions = allExpressions.length - index;
+        if (currentSet.length + remainingExpressions <= bestSet.length) {
+            return;
+        }
+
+        for (let i = index; i < allExpressions.length; i++) {
+            if (iterations >= SOLVER_CONFIG.maxBacktrackIterations) return;
+
+            const expr = allExpressions[i];
+            const result = canUseExpression(expr, nums, ops);
+
+            if (result) {
+                currentSet.push(expr);
+                backtrack(i + 1, currentSet, result.tempNums, result.tempOps);
+                currentSet.pop();
+            }
+        }
+    }
+
+    backtrack(0, [], availableNums, availableOps);
+
+    return bestSet;
 }
 
 // ==================== DISPLAY SOLUTIONS ====================
@@ -412,9 +502,23 @@ function setupButtons() {
     }
 
     if (btnSolve) {
-        btnSolve.addEventListener('click', () => {
-            const result = solvePuzzle();
-            displaySolutions(result);
+        btnSolve.addEventListener('click', async () => {
+            btnSolve.disabled = true;
+            btnSolve.textContent = 'Đang giải...';
+
+            // Allow UI to update before heavy computation
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            try {
+                const result = await solvePuzzle();
+                displaySolutions(result);
+            } catch (error) {
+                console.error('Solver error:', error);
+                showFeedback('Có lỗi xảy ra khi giải!', 'error');
+            } finally {
+                btnSolve.disabled = false;
+                btnSolve.textContent = 'Xem Cách Giải';
+            }
         });
     }
 
