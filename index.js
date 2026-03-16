@@ -2,6 +2,7 @@
 
 import { initRushHour } from './rush-hour.js';
 import { initMathPuzzle } from './math-puzzle.js';
+import { initChess } from './chess.js';
 
 // Tab configuration
 const TABS = {
@@ -15,6 +16,12 @@ const TABS = {
         id: 'tab-math-puzzle',
         btnId: 'tab-btn-math-puzzle',
         init: initMathPuzzle,
+        initialized: false
+    },
+    'chess': {
+        id: 'tab-chess',
+        btnId: 'tab-btn-chess',
+        init: initChess,
         initialized: false
     }
 };

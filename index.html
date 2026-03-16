@@ -902,6 +902,321 @@
       .suggest-no-improvement {
         color: #6c757d;
       }
+
+      /* ==================== CHESS PUZZLE STYLES ==================== */
+      .chess-container {
+        display: flex;
+        gap: 30px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      .chess-board-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .chess-board {
+        display: grid;
+        grid-template-columns: repeat(8, 50px);
+        grid-template-rows: repeat(8, 50px);
+        border: 4px solid #e94560;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+      .chess-board .cell {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 32px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+      }
+      .chess-board .cell.white {
+        background-color: #ffffff;
+      }
+      .chess-board .cell.black {
+        background-color: #919191;
+      }
+      .chess-board .cell:hover {
+        filter: brightness(1.2);
+      }
+      .chess-board .cell.selected {
+        background-color: #7fff00 !important;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+      }
+      .chess-board .cell.valid-move {
+        background-color: #90ee90 !important;
+      }
+      .chess-board .cell.valid-capture {
+        background-color: #ff6b6b !important;
+      }
+      .chess-board .cell.danger {
+        animation: chess-pulse-danger 0.5s ease infinite;
+      }
+      @keyframes chess-pulse-danger {
+        0%,
+        100% {
+          box-shadow: inset 0 0 20px rgba(255, 0, 0, 0.5);
+        }
+        50% {
+          box-shadow: inset 0 0 30px rgba(255, 0, 0, 0.8);
+        }
+      }
+      .chess-piece {
+        user-select: none;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      }
+      .chess-piece.player {
+        filter: drop-shadow(0 0 5px #00ff00);
+      }
+      .chess-piece.enemy {
+        filter: drop-shadow(0 0 3px #ff0000);
+      }
+      .chess-side-panel {
+        background: #2d3436;
+        padding: 25px;
+        border-radius: 15px;
+        color: white;
+        min-width: 300px;
+      }
+      .chess-info-box {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+      }
+      .chess-info-box h3 {
+        color: #e94560;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+      .chess-stat {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .chess-stat-label {
+        color: #aaa;
+      }
+      .chess-stat-value {
+        color: #00ff00;
+        font-weight: bold;
+      }
+      .chess-current-turn {
+        text-align: center;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        font-weight: bold;
+        font-size: 16px;
+      }
+      .chess-current-turn.player-turn {
+        background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+      }
+      .chess-current-turn.enemy-turn {
+        background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+      }
+      .chess-piece-selector {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+      .chess-piece-btn {
+        padding: 10px;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+      }
+      .chess-piece-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .chess-piece-btn.selected {
+        border-color: #ffd700;
+        background: rgba(255, 215, 0, 0.2);
+      }
+      .chess-piece-btn .piece-icon {
+        font-size: 28px;
+        display: block;
+      }
+      .chess-piece-btn .piece-name {
+        font-size: 11px;
+        margin-top: 3px;
+      }
+      .chess-btn {
+        width: 100%;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+      .chess-btn-switch {
+        background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+        color: white;
+      }
+      .chess-btn-switch:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(108, 92, 231, 0.4);
+      }
+      .chess-btn-clear {
+        background: linear-gradient(135deg, #fdcb6e 0%, #f39c12 100%);
+        color: white;
+      }
+      .chess-btn-clear:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4);
+      }
+      .chess-btn-restart {
+        background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+        color: white;
+      }
+      .chess-btn-restart:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(233, 69, 96, 0.4);
+      }
+      .chess-action-mode {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+      .chess-action-btn {
+        flex: 1;
+        padding: 10px;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 14px;
+      }
+      .chess-action-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .chess-action-btn.active {
+        border-color: #00ff00;
+        background: rgba(0, 255, 0, 0.2);
+      }
+      .chess-message {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(233, 69, 96, 0.9);
+        color: white;
+        padding: 15px 30px;
+        border-radius: 10px;
+        font-size: 18px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 100;
+      }
+      .chess-message.show {
+        opacity: 1;
+      }
+      .chess-message.info {
+        background: rgba(0, 184, 148, 0.9);
+      }
+      .chess-message.warning {
+        background: rgba(253, 203, 110, 0.9);
+        color: #333;
+      }
+      .chess-danger-info {
+        background: rgba(255, 0, 0, 0.2);
+        border: 1px solid #ff6b6b;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 10px;
+        font-size: 13px;
+      }
+      .chess-danger-info.safe {
+        background: rgba(0, 255, 0, 0.2);
+        border-color: #00ff00;
+      }
+      .chess-legend {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        font-size: 12px;
+      }
+      .chess-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .chess-legend-piece {
+        font-size: 20px;
+      }
+      .chess-captured-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 0, 0, 0.3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+      .chess-captured-overlay.show {
+        opacity: 1;
+        pointer-events: all;
+      }
+      .chess-captured-content {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        border: 3px solid #e94560;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        color: white;
+      }
+      .chess-captured-content h2 {
+        color: #e94560;
+        font-size: 28px;
+        margin-bottom: 15px;
+      }
+      .chess-captured-content p {
+        color: #aaa;
+        margin-bottom: 20px;
+      }
+      @media (max-width: 900px) {
+        .chess-container {
+          flex-direction: column;
+          align-items: center;
+        }
+        .chess-side-panel {
+          min-width: auto;
+          width: 100%;
+          max-width: 600px;
+        }
+      }
+      @media (max-width: 500px) {
+        .chess-board {
+          grid-template-columns: repeat(8, calc((100vw - 60px) / 8));
+          grid-template-rows: repeat(8, calc((100vw - 60px) / 8));
+        }
+        .chess-board .cell {
+          width: calc((100vw - 60px) / 8);
+          height: calc((100vw - 60px) / 8);
+          font-size: calc((100vw - 60px) / 12);
+        }
+      }
     </style>
   </head>
   <body>
@@ -915,6 +1230,7 @@
       <button class="tab-btn" id="tab-btn-math-puzzle">
         🔢 Math Expression Puzzle
       </button>
+      <button class="tab-btn" id="tab-btn-chess">♟ Chess Puzzle</button>
     </nav>
 
     <!-- Rush Hour Tab -->
@@ -1198,6 +1514,157 @@
           id="math-solutions"
           style="display: none"
         ></div>
+      </div>
+    </div>
+
+    <!-- Chess Puzzle Tab -->
+    <div class="tab-panel" id="tab-chess">
+      <div class="chess-message" id="chess-message"></div>
+
+      <div class="chess-container">
+        <div class="chess-board-section">
+          <h2>♟ Chess Puzzle - Hướng dẫn</h2>
+          <p style="color: #666; margin-bottom: 15px">Chế độ Luyện tập</p>
+          <div class="chess-board" id="chess-board"></div>
+        </div>
+
+        <div class="chess-side-panel">
+          <div class="chess-current-turn player-turn" id="chess-turn-indicator">
+            Lượt của: NGƯỜI CHƠI
+          </div>
+
+          <div class="chess-info-box">
+            <h3>📊 Thông tin</h3>
+            <div class="chess-stat">
+              <span class="chess-stat-label">Trạng thái:</span>
+              <span class="chess-stat-value" id="chess-game-status"
+                >Đặt quân xe</span
+              >
+            </div>
+            <div class="chess-stat">
+              <span class="chess-stat-label">Quân địch:</span>
+              <span class="chess-stat-value" id="chess-enemy-count">0</span>
+            </div>
+            <div id="chess-danger-status" class="chess-danger-info safe">
+              ✓ Quân xe đang an toàn
+            </div>
+          </div>
+
+          <div class="chess-info-box" id="chess-action-mode-box">
+            <h3>🎮 Hành động</h3>
+            <div class="chess-action-mode">
+              <button class="chess-action-btn active" id="chess-btn-move">
+                🔄 Di chuyển
+              </button>
+              <button class="chess-action-btn" id="chess-btn-add">
+                ➕ Thêm quân
+              </button>
+              <button class="chess-action-btn" id="chess-btn-remove">
+                ❌ Xóa quân
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="chess-info-box"
+            id="chess-piece-selector-box"
+            style="display: none"
+          >
+            <h3>♟ Chọn quân cờ để thêm</h3>
+            <div class="chess-piece-selector">
+              <button class="chess-piece-btn" data-piece="PAWN">
+                <span class="piece-icon">♟</span>
+                <span class="piece-name">Tốt</span>
+              </button>
+              <button class="chess-piece-btn" data-piece="BISHOP">
+                <span class="piece-icon">♝</span>
+                <span class="piece-name">Tượng</span>
+              </button>
+              <button class="chess-piece-btn" data-piece="KNIGHT">
+                <span class="piece-icon">♞</span>
+                <span class="piece-name">Mã</span>
+              </button>
+              <button class="chess-piece-btn" data-piece="ROOK">
+                <span class="piece-icon">♜</span>
+                <span class="piece-name">Xe</span>
+              </button>
+              <button class="chess-piece-btn" data-piece="QUEEN">
+                <span class="piece-icon">♛</span>
+                <span class="piece-name">Hậu</span>
+              </button>
+              <button class="chess-piece-btn" data-piece="KING">
+                <span class="piece-icon">♚</span>
+                <span class="piece-name">Vua</span>
+              </button>
+            </div>
+          </div>
+
+          <button class="chess-btn chess-btn-switch" id="chess-btn-switch-turn">
+            🔁 Chuyển lượt
+          </button>
+
+          <button class="chess-btn chess-btn-clear" id="chess-btn-clear">
+            🧹 Xóa tất cả quân địch
+          </button>
+
+          <button class="chess-btn chess-btn-restart" id="chess-btn-restart">
+            🔄 Làm lại từ đầu
+          </button>
+
+          <div class="chess-info-box">
+            <h3>📖 Hướng dẫn</h3>
+            <p style="font-size: 14px; line-height: 1.6">
+              • <b>Bước 1:</b> Nhấp để đặt quân xe của bạn<br />
+              • <b>Di chuyển:</b> Chọn quân và nhấp ô đích<br />
+              • <b>Thêm quân:</b> Chọn loại quân rồi nhấp ô trống<br />
+              • <b>Xóa quân:</b> Nhấp vào quân muốn xóa<br />
+              • <b>Ô đỏ:</b> Vùng nguy hiểm cho quân xe
+            </p>
+          </div>
+
+          <div class="chess-info-box">
+            <h3>💰 Điểm quân cờ</h3>
+            <div class="chess-legend">
+              <div class="chess-legend-item">
+                <span class="chess-legend-piece">♟</span> Tốt: 1đ
+              </div>
+              <div class="chess-legend-item">
+                <span class="chess-legend-piece">♝</span> Tượng: 3đ
+              </div>
+              <div class="chess-legend-item">
+                <span class="chess-legend-piece">♞</span> Mã: 3đ
+              </div>
+              <div class="chess-legend-item">
+                <span class="chess-legend-piece">♜</span> Xe: 5đ
+              </div>
+              <div class="chess-legend-item">
+                <span class="chess-legend-piece">♛</span> Hậu: 9đ
+              </div>
+              <div class="chess-legend-item">
+                <span class="chess-legend-piece">♚</span> Vua: 10đ
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chess-captured-overlay" id="chess-captured-overlay">
+        <div class="chess-captured-content">
+          <h2>⚠️ Quân xe bị bắt!</h2>
+          <p>
+            Quân xe của bạn đã bị quân địch ăn.<br />Trong game thực, đây là lúc
+            kết thúc!
+          </p>
+          <button class="chess-btn chess-btn-restart" id="chess-btn-undo">
+            ↩️ Hoàn tác
+          </button>
+          <button
+            class="chess-btn chess-btn-clear"
+            id="chess-btn-restart-overlay"
+          >
+            🔄 Làm lại
+          </button>
+        </div>
       </div>
     </div>
 
