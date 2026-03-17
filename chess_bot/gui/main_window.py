@@ -21,6 +21,7 @@ from config import load_config, save_config, get_templates_path
 from .setup_tab import SetupTab
 from .control_tab import ControlTab
 from .log_tab import LogTab
+from .preview_tab import PreviewTab
 
 
 class MainWindow:
@@ -48,10 +49,12 @@ class MainWindow:
         self.setup_tab = SetupTab(self.notebook, self)
         self.control_tab = ControlTab(self.notebook, self)
         self.log_tab = LogTab(self.notebook, self)
+        self.preview_tab = PreviewTab(self.notebook, self)
         
         self.notebook.add(self.setup_tab.frame, text="Setup")
         self.notebook.add(self.control_tab.frame, text="Control")
         self.notebook.add(self.log_tab.frame, text="Log")
+        self.notebook.add(self.preview_tab.frame, text="Detection Preview")
         
         status_frame = ttk.Frame(main_frame)
         status_frame.pack(fill=tk.X, pady=(10, 0))
@@ -66,6 +69,8 @@ class MainWindow:
             self.stop_bot()
         if hasattr(self.control_tab, 'stop_hotkey_listener'):
             self.control_tab.stop_hotkey_listener()
+        if hasattr(self.preview_tab, 'cleanup'):
+            self.preview_tab.cleanup()
         self.root.destroy()
         
     def update_status(self, text):
