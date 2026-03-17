@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chess Puzzle Game</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .game-container {
+        display: flex;
+        gap: 30px;
+        align-items: flex-start;
+      }
+
+      .board-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      h1 {
+        color: #e94560;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .chess-board {
+        display: grid;
+        grid-template-columns: repeat(12, 50px);
+        grid-template-rows: repeat(12, 50px);
+        border: 4px solid #e94560;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .cell {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 32px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+      }
+
+      .cell.white {
+        background-color: #ffffff;
+      }
+
+      .cell.black {
+        background-color: #919191;
+      }
+
+      .cell:hover {
+        filter: brightness(1.2);
+      }
+
+      .cell.selected {
+        background-color: #7fff00 !important;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+      }
+
+      .cell.valid-move {
+        background-color: #90ee90 !important;
+      }
+
+      .cell.valid-capture {
+        background-color: #ff6b6b !important;
+      }
+
+      .cell.danger {
+        animation: pulse-danger 0.5s ease infinite;
+      }
+
+      @keyframes pulse-danger {
+        0%,
+        100% {
+          box-shadow: inset 0 0 20px rgba(255, 0, 0, 0.5);
+        }
+        50% {
+          box-shadow: inset 0 0 30px rgba(255, 0, 0, 0.8);
+        }
+      }
+
+      .cell.highlighted {
+        animation: pulse-highlight 1s ease infinite;
+        border: 3px solid #ffd700;
+      }
+
+      @keyframes pulse-highlight {
+        0%,
+        100% {
+          box-shadow: inset 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+        50% {
+          box-shadow: inset 0 0 25px rgba(255, 215, 0, 0.8);
+        }
+      }
+
+      .piece {
+        user-select: none;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      }
+
+      .piece.player {
+        filter: drop-shadow(0 0 5px #00ff00);
+      }
+
+      .piece.enemy {
+        filter: drop-shadow(0 0 3px #ff0000);
+      }
+
+      .side-panel {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 25px;
+        border-radius: 15px;
+        color: white;
+        min-width: 280px;
+        backdrop-filter: blur(10px);
+      }
+
+      .info-box {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+      }
+
+      .info-box h3 {
+        color: #e94560;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
+      .info-box p {
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .stat {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .stat-label {
+        color: #aaa;
+      }
+
+      .stat-value {
+        color: #00ff00;
+        font-weight: bold;
+      }
+
+      .next-piece-display {
+        text-align: center;
+        padding: 20px;
+        background: rgba(233, 69, 96, 0.2);
+        border-radius: 10px;
+        margin-bottom: 15px;
+      }
+
+      .next-piece-display .piece-preview {
+        font-size: 48px;
+        margin: 10px 0;
+      }
+
+      .countdown {
+        font-size: 24px;
+        color: #ffd700;
+        font-weight: bold;
+      }
+
+      .btn {
+        width: 100%;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+
+      .btn-revive {
+        background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+        color: white;
+      }
+
+      .btn-revive:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 184, 148, 0.4);
+      }
+
+      .btn-revive:disabled {
+        background: #555;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+
+      .btn-restart {
+        background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+        color: white;
+      }
+
+      .btn-restart:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(233, 69, 96, 0.4);
+      }
+
+      .game-over-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .game-over-overlay.show {
+        opacity: 1;
+        pointer-events: all;
+      }
+
+      .game-over-content {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        border: 3px solid #e94560;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      }
+
+      .game-over-content h2 {
+        color: #e94560;
+        font-size: 36px;
+        margin-bottom: 20px;
+      }
+
+      .game-over-content .final-score {
+        color: #ffd700;
+        font-size: 48px;
+        margin: 20px 0;
+      }
+
+      .game-over-content .btn {
+        width: auto;
+        padding: 15px 40px;
+      }
+
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .legend-piece {
+        font-size: 20px;
+      }
+
+      .message {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(233, 69, 96, 0.9);
+        color: white;
+        padding: 15px 30px;
+        border-radius: 10px;
+        font-size: 18px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 100;
+      }
+
+      .message.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="message" id="message"></div>
+
+    <div class="game-container">
+      <div class="board-section">
+        <h1>♟ Chess Puzzle Game ♟</h1>
+        <div class="chess-board" id="board"></div>
+      </div>
+
+      <div class="side-panel">
+        <div class="info-box">
+          <h3>📊 Thống kê</h3>
+          <div class="stat">
+            <span class="stat-label">Điểm số:</span>
+            <span class="stat-value" id="score">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Lượt chơi:</span>
+            <span class="stat-value" id="turn">1</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Quân đã ăn:</span>
+            <span class="stat-value" id="captured">0</span>
+          </div>
+        </div>
+
+        <div class="next-piece-display">
+          <h3>🎯 Quân tiếp theo</h3>
+          <div class="piece-preview" id="next-piece">-</div>
+          <div>Sau <span class="countdown" id="turns-until">-</span> lượt</div>
+          <div
+            id="next-count"
+            style="font-size: 12px; color: #aaa; margin-top: 5px"
+          ></div>
+        </div>
+
+        <div class="info-box">
+          <h3>📖 Hướng dẫn</h3>
+          <p>
+            • Nhấp vào quân xe của bạn (xanh) để chọn<br />
+            • Nhấp vào ô xanh để di chuyển<br />
+            • Nhấp vào ô đỏ để ăn quân địch<br />
+            • Tránh bị các quân cờ đen ăn!
+          </p>
+        </div>
+
+        <div class="info-box">
+          <h3>💰 Điểm số</h3>
+          <div class="legend">
+            <div class="legend-item">
+              <span class="legend-piece">♟</span> Tốt: 1đ
+            </div>
+            <div class="legend-item">
+              <span class="legend-piece">♝</span> Tượng: 3đ
+            </div>
+            <div class="legend-item">
+              <span class="legend-piece">♞</span> Mã: 3đ
+            </div>
+            <div class="legend-item">
+              <span class="legend-piece">♜</span> Xe: 5đ
+            </div>
+            <div class="legend-item">
+              <span class="legend-piece">♛</span> Hậu: 9đ
+            </div>
+            <div class="legend-item">
+              <span class="legend-piece">♚</span> Vua: 10đ
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-revive" id="revive-btn" onclick="revivePlayer()">
+          💫 Hồi sinh (1 lần)
+        </button>
+        <button class="btn btn-restart" onclick="restartGame()">
+          🔄 Chơi lại
+        </button>
+        <button
+          class="btn btn-tutorial"
+          onclick="window.location.href = 'tutorial.html'"
+          style="
+            background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+            color: white;
+          "
+        >
+          📚 Chế độ Hướng dẫn
+        </button>
+      </div>
+    </div>
+
+    <div class="game-over-overlay" id="game-over">
+      <div class="game-over-content">
+        <h2>☠️ Game Over!</h2>
+        <p style="color: #aaa">Quân xe của bạn đã bị ăn!</p>
+        <div class="final-score">Điểm: <span id="final-score">0</span></div>
+        <button class="btn btn-restart" onclick="restartGame()">
+          🔄 Chơi lại
+        </button>
+      </div>
+    </div>
+
+    <script src="game.js"></script>
+  </body>
+</html>
