@@ -134,12 +134,35 @@ class AIPlayer:
                          danger_cells: Set[Tuple[int, int]]) -> Optional[Tuple[int, int, bool]]:
         if not valid_moves:
             return None
-            
-        scored_moves = []
+        
+        # Phân loại nước đi: an toàn vs tự sát (ăn xong bị ăn lại)
+        safe_moves = []
+        suicide_moves = []
         
         for move in valid_moves:
+            target_row, target_col, is_capture = move
+            is_suicide = False
+            
+            if is_capture:
+                future_danger = self._simulate_danger_after_capture(target_row, target_col, board_state)
+                if (target_row, target_col) in future_danger:
+                    is_suicide = True
+            else:
+                if (target_row, target_col) in danger_cells:
+                    is_suicide = True
+            
             score = self._evaluate_move(move, board_state, danger_cells)
-            scored_moves.append((score, move))
+            
+            if is_suicide:
+                suicide_moves.append((score, move))
+            else:
+                safe_moves.append((score, move))
+        
+        # Ưu tiên nước đi an toàn, chỉ dùng nước tự sát khi không còn lựa chọn
+        if safe_moves:
+            scored_moves = safe_moves
+        else:
+            scored_moves = suicide_moves
             
         scored_moves.sort(key=lambda x: x[0], reverse=True)
         
@@ -158,24 +181,19 @@ class AIPlayer:
         target_row, target_col, is_capture = move
         score = 0.0
         
-        if (target_row, target_col) in danger_cells:
-            score -= 1000
-            
         if is_capture:
             piece = board_state[target_row][target_col]
             if piece:
                 piece_value = PIECE_VALUES.get(piece.type, 1)
-                score += piece_value * 10
+                # Thưởng theo giá trị quân ăn được
+                score += piece_value * 20
                 
-                future_danger = self._simulate_danger_after_capture(
-                    target_row, target_col, board_state
-                )
-                if (target_row, target_col) not in future_danger:
-                    score += 50
-                else:
-                    score -= piece_value * 5
-                    
-        escape_routes = self._count_safe_escapes(target_row, target_col, board_state, danger_cells)
+            # Tính danger sau khi ăn
+            future_danger = self._simulate_danger_after_capture(target_row, target_col, board_state)
+            escape_routes = self._count_safe_escapes(target_row, target_col, board_state, future_danger)
+        else:
+            escape_routes = self._count_safe_escapes(target_row, target_col, board_state, danger_cells)
+            
         score += escape_routes * 5
         
         center_dist = abs(target_row - 3.5) + abs(target_col - 3.5)
@@ -189,18 +207,25 @@ class AIPlayer:
         
         return score
         
-    def _simulate_danger_after_capture(self, row: int, col: int, 
+    def _simulate_danger_after_capture(self, target_row: int, target_col: int, 
                                         board_state: List[List]) -> Set[Tuple[int, int]]:
+        """
+        Mô phỏng các ô nguy hiểm SAU KHI player di chuyển đến (target_row, target_col) và ăn quân ở đó.
+        Quân bị ăn tại target sẽ biến mất, player sẽ chiếm vị trí đó.
+        """
         danger = set()
         
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
-                if r == row and c == col:
+                # Bỏ qua ô mà player sẽ chiếm (quân địch ở đây sẽ bị ăn)
+                if r == target_row and c == target_col:
                     continue
                     
                 piece = board_state[r][c]
                 if piece and not piece.is_player:
-                    attacks = self._get_attack_moves_after_capture(r, c, piece.type, board_state, row, col)
+                    attacks = self._get_attack_moves_after_capture(
+                        r, c, piece.type, board_state, target_row, target_col
+                    )
                     danger.update(attacks)
                     
         return danger
@@ -208,6 +233,12 @@ class AIPlayer:
     def _get_attack_moves_after_capture(self, row: int, col: int, piece_type: str,
                                          board_state: List[List], 
                                          captured_row: int, captured_col: int) -> List[Tuple[int, int]]:
+        """
+        Tính các ô bị tấn công bởi quân địch SAU KHI player ăn quân tại (captured_row, captured_col).
+        Sau khi ăn:
+        - Quân bị ăn biến mất → không còn chặn đường
+        - Quân player chiếm vị trí đó → chặn đường tấn công của quân địch khác
+        """
         attacks = []
         
         if piece_type in ['PAWN', 'KNIGHT', 'KING']:
@@ -225,11 +256,14 @@ class AIPlayer:
                 nr, nc = row + dr * i, col + dc * i
                 if not self._is_valid_pos(nr, nc):
                     break
+                    
                 attacks.append((nr, nc))
                 
+                # Vị trí mà player sẽ chiếm sau khi ăn - quân player chặn đường
                 if nr == captured_row and nc == captured_col:
-                    continue
+                    break
                     
+                # Các quân khác vẫn chặn đường như bình thường
                 if board_state[nr][nc] is not None:
                     break
                     
