@@ -1,0 +1,40 @@
+# Build artifacts
+build/
+dist/
+# release/
+*.spec
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Config (user-specific)
+chess_bot_config.json
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Template images (user should add their own)
+templates/*.png
+templates/*.jpg
+templates/*.jpeg
+
+# Keep templates folder structure
+!templates/.gitkeep
