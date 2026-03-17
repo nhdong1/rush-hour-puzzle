@@ -29,8 +29,7 @@ python main.py
 2. **Pick màu ô cờ**: 
    - Click "Pick Color" cho ô sáng -> Click vào ô sáng trên game
    - Click "Pick Color" cho ô tối -> Click vào ô tối trên game
-3. **Chọn vị trí nút Hồi sinh** (tùy chọn): Click "Select Revive Button Position" -> Click vào nút hồi sinh trên game
-4. Click "Save Configuration" để lưu
+3. Click "Save Configuration" để lưu
 
 ### 3. Thêm template quân cờ
 
@@ -52,8 +51,7 @@ python main.py
 ### 4. Chạy bot (Tab Control)
 
 1. Điều chỉnh tốc độ di chuyển (Move delay)
-2. Bật/tắt Auto revive nếu cần
-3. Click "Start" để bắt đầu
+2. Click "Start" để bắt đầu
 4. Click "Pause" để tạm dừng
 5. Click "Stop" để dừng hoàn toàn
 

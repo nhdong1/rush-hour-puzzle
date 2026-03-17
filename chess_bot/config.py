@@ -20,9 +20,7 @@ default_config = {
     "dark_cell_color": None,
     "color_tolerance": 30,
     "move_delay": 500,
-    "auto_revive": True,
     "templates_path": "templates/",
-    "revive_button_pos": None,
 }
 
 

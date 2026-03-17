@@ -6,7 +6,6 @@
 2. Tab Setup:
    - Click "Select Game Region" để chọn vùng bàn cờ
    - Click "Pick Color" để chọn màu ô sáng và ô tối
-   - Click "Select Revive Button Position" để chọn vị trí nút hồi sinh
    - Click "Save Configuration" để lưu cấu hình
 3. Tab Control:
    - F5: Start bot

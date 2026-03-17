@@ -88,19 +88,6 @@ class SetupTab:
         self.tolerance_label = ttk.Label(tolerance_frame, text="30")
         self.tolerance_label.pack(side=tk.LEFT)
         
-        revive_frame = ttk.LabelFrame(left_frame, text="Revive Button", padding="10")
-        revive_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        self.select_revive_btn = ttk.Button(
-            revive_frame,
-            text="Select Revive Button Position",
-            command=self._select_revive_position
-        )
-        self.select_revive_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
-        self.revive_label = ttk.Label(revive_frame, text="Not set")
-        self.revive_label.pack(side=tk.LEFT)
-        
         save_frame = ttk.Frame(left_frame)
         save_frame.pack(fill=tk.X, pady=(10, 0))
         
@@ -138,9 +125,6 @@ class SetupTab:
             hex_color = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
             self.dark_color_preview.config(bg=hex_color)
             
-        if config.get("revive_button_pos"):
-            pos = config["revive_button_pos"]
-            self.revive_label.config(text=f"Position: ({pos[0]}, {pos[1]})")
             
     def _select_region(self):
         self.main_window.root.iconify()
@@ -193,24 +177,6 @@ class SetupTab:
         int_value = int(float(value))
         self.tolerance_label.config(text=str(int_value))
         self.main_window.config["color_tolerance"] = int_value
-        
-    def _select_revive_position(self):
-        self.main_window.root.iconify()
-        self.main_window.root.after(300, self._start_revive_selection)
-        
-    def _start_revive_selection(self):
-        from .color_picker import ColorPicker
-        picker = ColorPicker(self._on_revive_selected, pick_position_only=True)
-        
-    def _on_revive_selected(self, pos):
-        self.main_window.root.deiconify()
-        
-        if pos is None:
-            return
-            
-        self.main_window.config["revive_button_pos"] = list(pos)
-        self.revive_label.config(text=f"Position: ({pos[0]}, {pos[1]})")
-        self.main_window.log(f"Revive button position: ({pos[0]}, {pos[1]})")
         
     def _update_preview(self):
         region = self.main_window.config.get("game_region")

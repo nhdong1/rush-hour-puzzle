@@ -167,17 +167,9 @@ class MainWindow:
                     if no_rook_count >= max_no_rook_retries:
                         self._safe_log("Player rook not found - checking for game over")
                         
-                        if self.config.get("auto_revive") and self.config.get("revive_button_pos"):
-                            self._safe_log("Attempting to revive...")
-                            revive_pos = self.config["revive_button_pos"]
-                            mouse.click(revive_pos[0], revive_pos[1])
-                            no_rook_count = 0
-                            time.sleep(1.5)
-                            continue
-                        else:
-                            self._safe_log("Game over or rook not detected - waiting...")
-                            time.sleep(2)
-                            continue
+                        self._safe_log("Game over or rook not detected - waiting...")
+                        time.sleep(2)
+                        continue
                     else:
                         time.sleep(0.3)
                         continue

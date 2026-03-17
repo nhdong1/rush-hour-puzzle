@@ -80,20 +80,6 @@ class ControlTab:
         self.speed_label = ttk.Label(speed_frame, text="500", width=5)
         self.speed_label.pack(side=tk.LEFT)
         
-        options_frame = ttk.Frame(settings_frame)
-        options_frame.pack(fill=tk.X)
-        
-        self.auto_revive_var = tk.BooleanVar(
-            value=self.main_window.config.get("auto_revive", True)
-        )
-        self.auto_revive_check = ttk.Checkbutton(
-            options_frame,
-            text="Auto revive when game over",
-            variable=self.auto_revive_var,
-            command=self._on_auto_revive_change
-        )
-        self.auto_revive_check.pack(anchor=tk.W)
-        
         status_frame = ttk.LabelFrame(self.frame, text="Statistics", padding="15")
         status_frame.pack(fill=tk.X, pady=(0, 10))
         
@@ -148,9 +134,6 @@ class ControlTab:
         int_value = int(float(value))
         self.speed_label.config(text=str(int_value))
         self.main_window.config["move_delay"] = int_value
-        
-    def _on_auto_revive_change(self):
-        self.main_window.config["auto_revive"] = self.auto_revive_var.get()
         
     def _update_timer(self):
         if not self.timer_running:
