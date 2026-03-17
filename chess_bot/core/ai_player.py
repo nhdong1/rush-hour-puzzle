@@ -18,6 +18,8 @@ class AIPlayer:
     def __init__(self):
         self.last_position = None
         self.position_history = []
+        self.safety_threshold = 0.7  # Tỷ lệ ô an toàn tối thiểu để coi là "an toàn"
+        self.repeat_move_count = 0  # Đếm số lần lặp nước đi để chuyển sang chế độ "thoát hiểm"
         
     def get_valid_moves(self, rook_pos: Tuple[int, int], board_state: List[List]) -> List[Tuple[int, int, bool]]:
         if rook_pos is None:
@@ -137,16 +139,23 @@ class AIPlayer:
         
         # Phân loại nước đi: an toàn vs tự sát (ăn xong bị ăn lại)
         safe_moves = []
+        risky_moves = []
         suicide_moves = []
         
         for move in valid_moves:
             target_row, target_col, is_capture = move
             is_suicide = False
+            is_risky = False
             
             if is_capture:
                 future_danger = self._simulate_danger_after_capture(target_row, target_col, board_state)
                 if (target_row, target_col) in future_danger:
                     is_suicide = True
+                else:
+                    # Kiểm tra nước ăn có giảm số ô trốn không
+                    escape_routes = self._count_safe_escapes(target_row, target_col, board_state, future_danger)
+                    if escape_routes < 2:
+                        is_risky = True
             else:
                 if (target_row, target_col) in danger_cells:
                     is_suicide = True
@@ -155,12 +164,16 @@ class AIPlayer:
             
             if is_suicide:
                 suicide_moves.append((score, move))
+            elif is_risky:
+                risky_moves.append((score, move))
             else:
                 safe_moves.append((score, move))
         
-        # Ưu tiên nước đi an toàn, chỉ dùng nước tự sát khi không còn lựa chọn
+        # Ưu tiên: An toàn > Risky > Tự sát
         if safe_moves:
             scored_moves = safe_moves
+        elif risky_moves:
+            scored_moves = risky_moves
         else:
             scored_moves = suicide_moves
             
@@ -194,16 +207,19 @@ class AIPlayer:
         else:
             escape_routes = self._count_safe_escapes(target_row, target_col, board_state, danger_cells)
             
-        score += escape_routes * 5
+        # Tăng trọng số ô trốn an toàn (tăng tính an toàn)
+        score += escape_routes * 10
         
         center_dist = abs(target_row - 3.5) + abs(target_col - 3.5)
         score += (7 - center_dist) * 2
         
+        # Giảm phạt lặp nước cuối cùng (cho phép đi lặp lại nước trước)
         if self.last_position and (target_row, target_col) == self.last_position:
-            score -= 20
+            score -= 5
             
+        # Giảm phạt lặp vị trí lịch sử (từ -200 xuống -50, cho phép đi lặp hơn)
         position_count = self.position_history.count((target_row, target_col))
-        score -= position_count * 10
+        score -= position_count * 2.5
         
         return score
         
