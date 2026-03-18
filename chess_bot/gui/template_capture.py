@@ -150,6 +150,8 @@ class TemplateCaptureDialog:
 
     def _start_capture(self):
         """Start fullscreen capture mode"""
+        # Release grab so overlay can receive events
+        self.dialog.grab_release()
         self.dialog.withdraw()
         self.parent.after(300, self._open_capture_overlay)
 
@@ -165,7 +167,14 @@ class TemplateCaptureDialog:
             image: PIL Image of captured region
             region: (x1, y1, x2, y2) tuple
         """
-        self.dialog.deiconify()
+        # Check if dialog still exists before trying to show it
+        try:
+            if not self.dialog.winfo_exists():
+                return
+            self.dialog.deiconify()
+            self.dialog.grab_set()  # Re-acquire grab
+        except tk.TclError:
+            return
 
         if image is None:
             self.status_label.config(text="Đã hủy", foreground="orange")
@@ -252,7 +261,7 @@ class TemplateCaptureDialog:
 
 
 class CaptureOverlay:
-    """Fullscreen overlay for region selection"""
+    """Fullscreen overlay for region selection - based on RegionSelector logic"""
 
     def __init__(self, callback):
         """
@@ -266,7 +275,7 @@ class CaptureOverlay:
         self.start_y = None
         self.rect_id = None
 
-        # Take screenshot
+        # Take screenshot first
         self.screenshot = ImageGrab.grab()
 
         # Create fullscreen window
@@ -326,7 +335,7 @@ class CaptureOverlay:
         self.rect_id = self.canvas.create_rectangle(
             self.start_x, self.start_y,
             self.start_x, self.start_y,
-            outline="lime",
+            outline="red",
             width=2
         )
 
@@ -342,27 +351,25 @@ class CaptureOverlay:
         end_x = event.x
         end_y = event.y
 
+        # Destroy window first
         self.root.destroy()
 
-        if self.start_x is None or self.start_y is None:
+        # Check if valid selection
+        if self.start_x is not None and self.start_y is not None:
+            if abs(end_x - self.start_x) > 10 and abs(end_y - self.start_y) > 10:
+                # Ensure proper coordinates
+                x1 = min(self.start_x, end_x)
+                y1 = min(self.start_y, end_y)
+                x2 = max(self.start_x, end_x)
+                y2 = max(self.start_y, end_y)
+
+                # Crop screenshot
+                cropped = self.screenshot.crop((x1, y1, x2, y2))
+                self.callback(cropped, (x1, y1, x2, y2))
+            else:
+                self.callback(None, None)
+        else:
             self.callback(None, None)
-            return
-
-        # Ensure proper coordinates
-        x1 = min(self.start_x, end_x)
-        y1 = min(self.start_y, end_y)
-        x2 = max(self.start_x, end_x)
-        y2 = max(self.start_y, end_y)
-
-        # Check minimum size
-        if abs(x2 - x1) < 5 or abs(y2 - y1) < 5:
-            self.callback(None, None)
-            return
-
-        # Crop screenshot
-        cropped = self.screenshot.crop((x1, y1, x2, y2))
-
-        self.callback(cropped, (x1, y1, x2, y2))
 
     def _on_cancel(self, event):
         self.root.destroy()
