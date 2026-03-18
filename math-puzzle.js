@@ -12,20 +12,11 @@ let gameState = {
     targetResult: 22
 };
 
-// ==================== URL PARAMS ====================
+// ==================== UI STATE ====================
 
-function getUrlParam(param) {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get(param);
-}
-
-function shouldShowSuggest() {
-    return getUrlParam('showSuggest') === '1';
-}
-
-function shouldShowRemaining() {
-    return getUrlParam('showRemaining') === '1';
-}
+let showSuggest = false;
+let showRemaining = false;
+let lastSolveResult = null;
 
 function formatOperatorForDisplay(op) {
     const displayMap = { '*': '×', '/': '÷' };
@@ -39,14 +30,35 @@ export function initMathPuzzle() {
     setupOperatorInputs();
     setupRequirementInputs();
     setupButtons();
+    setupOptionCheckboxes();
     updateExpressionSlots();
+}
 
-    // Show suggest section if URL param is set
-    if (shouldShowSuggest()) {
-        const suggestSection = document.getElementById('suggest-section');
-        if (suggestSection) {
-            suggestSection.style.display = 'block';
-        }
+function setupOptionCheckboxes() {
+    const suggestCheckbox = document.getElementById('chk-show-suggest');
+    const remainingCheckbox = document.getElementById('chk-show-remaining');
+    const suggestSection = document.getElementById('suggest-section');
+
+    if (suggestCheckbox) {
+        suggestCheckbox.checked = showSuggest;
+        suggestCheckbox.addEventListener('change', function () {
+            showSuggest = this.checked;
+            if (suggestSection) {
+                suggestSection.style.display = showSuggest ? 'block' : 'none';
+            }
+        });
+    }
+
+    if (remainingCheckbox) {
+        remainingCheckbox.checked = showRemaining;
+        remainingCheckbox.addEventListener('change', function () {
+            showRemaining = this.checked;
+            // Re-render solutions if they exist
+            const solutionsContainer = document.getElementById('math-solutions');
+            if (solutionsContainer && solutionsContainer.style.display !== 'none' && lastSolveResult) {
+                displaySolutions(lastSolveResult);
+            }
+        });
     }
 }
 
@@ -460,6 +472,8 @@ function displaySolutions(result) {
     const list = document.createElement('div');
     list.className = 'solutions-list';
 
+    const isLastIndex = result.solutions.length - 1;
+
     result.solutions.forEach((sol, index) => {
         const item = document.createElement('div');
         item.className = 'solution-item';
@@ -471,8 +485,8 @@ function displaySolutions(result) {
         `;
         list.appendChild(item);
 
-        // Show remaining resources after this solution (only if URL param is set)
-        if (shouldShowRemaining()) {
+        // Show remaining resources only for the last solution (when checkbox is checked)
+        if (showRemaining && index === isLastIndex) {
             const remainingDiv = document.createElement('div');
             remainingDiv.className = 'remaining-resources';
             remainingDiv.innerHTML = '<span class="remaining-label">Còn lại:</span>';
@@ -798,6 +812,7 @@ function setupButtons() {
 
             try {
                 const result = await solvePuzzle();
+                lastSolveResult = result;
                 displaySolutions(result);
             } catch (error) {
                 console.error('Solver error:', error);
@@ -869,6 +884,7 @@ function resetGame() {
         solutionsContainer.innerHTML = '';
         solutionsContainer.style.display = 'none';
     }
+    lastSolveResult = null;
 
     updateExpressionSlots();
 }
