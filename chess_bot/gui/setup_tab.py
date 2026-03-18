@@ -26,7 +26,7 @@ class SetupTab:
         right_frame = ttk.Frame(self.frame)
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        region_frame = ttk.LabelFrame(left_frame, text="Game Region", padding="10")
+        region_frame = ttk.LabelFrame(left_frame, text="Vùng chơi", padding="10")
         region_frame.pack(fill=tk.X, pady=(0, 10))
 
         btn_frame = ttk.Frame(region_frame)
@@ -34,24 +34,24 @@ class SetupTab:
 
         self.select_region_btn = ttk.Button(
             btn_frame,
-            text="Select Game Region",
+            text="Chọn vùng chơi",
             command=self._select_region
         )
         self.select_region_btn.pack(side=tk.LEFT, padx=(0, 5))
 
-        self.region_label = ttk.Label(region_frame, text="No region selected")
+        self.region_label = ttk.Label(region_frame, text="Chưa chọn vùng")
         self.region_label.pack(fill=tk.X, pady=(5, 0))
 
-        color_frame = ttk.LabelFrame(left_frame, text="Cell Colors", padding="10")
+        color_frame = ttk.LabelFrame(left_frame, text="Màu ô cờ", padding="10")
         color_frame.pack(fill=tk.X, pady=(0, 10))
 
         light_frame = ttk.Frame(color_frame)
         light_frame.pack(fill=tk.X, pady=(0, 5))
 
-        ttk.Label(light_frame, text="Light cell:").pack(side=tk.LEFT)
+        ttk.Label(light_frame, text="Ô sáng:").pack(side=tk.LEFT)
         self.light_color_btn = ttk.Button(
             light_frame,
-            text="Pick Color",
+            text="Chọn màu",
             command=lambda: self._pick_color("light")
         )
         self.light_color_btn.pack(side=tk.LEFT, padx=5)
@@ -62,10 +62,10 @@ class SetupTab:
         dark_frame = ttk.Frame(color_frame)
         dark_frame.pack(fill=tk.X, pady=(0, 5))
 
-        ttk.Label(dark_frame, text="Dark cell:").pack(side=tk.LEFT)
+        ttk.Label(dark_frame, text="Ô tối:").pack(side=tk.LEFT)
         self.dark_color_btn = ttk.Button(
             dark_frame,
-            text="Pick Color",
+            text="Chọn màu",
             command=lambda: self._pick_color("dark")
         )
         self.dark_color_btn.pack(side=tk.LEFT, padx=5)
@@ -76,7 +76,7 @@ class SetupTab:
         tolerance_frame = ttk.Frame(color_frame)
         tolerance_frame.pack(fill=tk.X, pady=(5, 0))
 
-        ttk.Label(tolerance_frame, text="Color tolerance:").pack(side=tk.LEFT)
+        ttk.Label(tolerance_frame, text="Dung sai màu:").pack(side=tk.LEFT)
         self.tolerance_var = tk.IntVar(value=self.main_window.config.get("color_tolerance", 30))
         self.tolerance_scale = ttk.Scale(
             tolerance_frame,
@@ -91,7 +91,7 @@ class SetupTab:
         self.tolerance_label.pack(side=tk.LEFT)
 
         # Template Management section
-        template_frame = ttk.LabelFrame(left_frame, text="Template Management", padding="10")
+        template_frame = ttk.LabelFrame(left_frame, text="Quản lý Template", padding="10")
         template_frame.pack(fill=tk.X, pady=(0, 10))
 
         template_btn_frame = ttk.Frame(template_frame)
@@ -99,14 +99,14 @@ class SetupTab:
 
         self.capture_template_btn = ttk.Button(
             template_btn_frame,
-            text="📷 Capture Template",
+            text="📷 Chụp Template",
             command=self._open_template_capture
         )
         self.capture_template_btn.pack(side=tk.LEFT, padx=(0, 5))
 
         self.refresh_templates_btn = ttk.Button(
             template_btn_frame,
-            text="🔄 Refresh",
+            text="🔄 Làm mới",
             command=self._refresh_template_list,
             width=10
         )
@@ -121,7 +121,7 @@ class SetupTab:
 
         self.delete_template_btn = ttk.Button(
             template_action_frame,
-            text="🗑️ Delete Selected",
+            text="🗑️ Xóa đã chọn",
             command=self._delete_selected_template
         )
         self.delete_template_btn.pack(side=tk.LEFT)
@@ -134,12 +134,12 @@ class SetupTab:
 
         self.save_btn = ttk.Button(
             save_frame,
-            text="Save Configuration",
+            text="Lưu cấu hình",
             command=self._save_config
         )
         self.save_btn.pack(side=tk.LEFT)
 
-        preview_frame = ttk.LabelFrame(right_frame, text="Preview", padding="10")
+        preview_frame = ttk.LabelFrame(right_frame, text="Xem trước", padding="10")
         preview_frame.pack(fill=tk.BOTH, expand=True)
 
         self.preview_canvas = tk.Canvas(preview_frame, bg="gray", width=300, height=300)
@@ -151,7 +151,7 @@ class SetupTab:
         if config.get("game_region"):
             region = config["game_region"]
             self.region_label.config(
-                text=f"Region: ({region[0]}, {region[1]}) to ({region[2]}, {region[3]})"
+                text=f"Vùng: ({region[0]}, {region[1]}) đến ({region[2]}, {region[3]})"
             )
 
         if config.get("light_cell_color"):
@@ -185,10 +185,10 @@ class SetupTab:
         y1, y2 = min(y1, y2), max(y1, y2)
 
         self.main_window.config["game_region"] = [x1, y1, x2, y2]
-        self.region_label.config(text=f"Region: ({x1}, {y1}) to ({x2}, {y2})")
+        self.region_label.config(text=f"Vùng: ({x1}, {y1}) đến ({x2}, {y2})")
 
         self._update_preview()
-        self.main_window.log(f"Game region selected: ({x1}, {y1}) to ({x2}, {y2})")
+        self.main_window.log(f"Đã chọn vùng chơi: ({x1}, {y1}) đến ({x2}, {y2})")
 
     def _pick_color(self, color_type):
         self.main_window.root.iconify()
@@ -210,12 +210,12 @@ class SetupTab:
             self.light_color = color
             self.main_window.config["light_cell_color"] = list(color)
             self.light_color_preview.config(bg=hex_color)
-            self.main_window.log(f"Light cell color: RGB{color}")
+            self.main_window.log(f"Màu ô sáng: RGB{color}")
         else:
             self.dark_color = color
             self.main_window.config["dark_cell_color"] = list(color)
             self.dark_color_preview.config(bg=hex_color)
-            self.main_window.log(f"Dark cell color: RGB{color}")
+            self.main_window.log(f"Màu ô tối: RGB{color}")
 
     def _on_tolerance_change(self, value):
         int_value = int(float(value))
@@ -264,11 +264,11 @@ class SetupTab:
                 anchor=tk.CENTER
             )
         except Exception as e:
-            self.main_window.log(f"Preview error: {str(e)}")
+            self.main_window.log(f"Lỗi xem trước: {str(e)}")
 
     def _save_config(self):
         self.main_window.save_current_config()
-        messagebox.showinfo("Success", "Configuration saved successfully!")
+        messagebox.showinfo("Thành công", "Cấu hình đã được lưu!")
 
     def _open_template_capture(self):
         """Open template capture dialog"""
@@ -283,7 +283,7 @@ class SetupTab:
     def _on_template_saved(self, template_name):
         """Callback when template is saved"""
         self._refresh_template_list()
-        self.main_window.log(f"Template saved: {template_name}")
+        self.main_window.log(f"Đã lưu template: {template_name}")
 
     def _refresh_template_list(self):
         """Refresh the template listbox"""
@@ -291,7 +291,7 @@ class SetupTab:
 
         templates_path = get_templates_path()
         if not os.path.exists(templates_path):
-            self.template_count_label.config(text="0 templates")
+            self.template_count_label.config(text="0 template")
             return
 
         templates = []
@@ -304,19 +304,19 @@ class SetupTab:
         for name in templates:
             self.template_listbox.insert(tk.END, name)
 
-        self.template_count_label.config(text=f"{len(templates)} templates")
+        self.template_count_label.config(text=f"{len(templates)} template")
 
     def _delete_selected_template(self):
         """Delete selected template from list"""
         selection = self.template_listbox.curselection()
         if not selection:
-            messagebox.showwarning("Warning", "Please select a template to delete")
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn template để xóa")
             return
 
         template_name = self.template_listbox.get(selection[0])
 
-        if not messagebox.askyesno("Confirm Delete",
-                                    f"Delete template '{template_name}'?"):
+        if not messagebox.askyesno("Xác nhận xóa",
+                                    f"Xóa template '{template_name}'?"):
             return
 
         templates_path = get_templates_path()
@@ -326,7 +326,7 @@ class SetupTab:
             filepath = os.path.join(templates_path, f"{template_name}{ext}")
             if os.path.exists(filepath):
                 os.remove(filepath)
-                self.main_window.log(f"Template deleted: {template_name}")
+                self.main_window.log(f"Đã xóa template: {template_name}")
                 break
 
         self._refresh_template_list()

@@ -26,7 +26,7 @@ class ControlTab:
         self._setup_hotkeys()
 
     def _setup_ui(self):
-        control_frame = ttk.LabelFrame(self.frame, text="Bot Control", padding="15")
+        control_frame = ttk.LabelFrame(self.frame, text="Điều khiển Bot", padding="15")
         control_frame.pack(fill=tk.X, pady=(0, 10))
 
         btn_frame = ttk.Frame(control_frame)
@@ -34,7 +34,7 @@ class ControlTab:
 
         self.start_btn = ttk.Button(
             btn_frame,
-            text="Start (F5)",
+            text="Bắt đầu (F5)",
             command=self._on_start,
             width=15
         )
@@ -42,7 +42,7 @@ class ControlTab:
 
         self.pause_btn = ttk.Button(
             btn_frame,
-            text="Pause (F6)",
+            text="Tạm dừng (F6)",
             command=self._on_pause,
             width=15,
             state=tk.DISABLED
@@ -51,14 +51,14 @@ class ControlTab:
 
         self.stop_btn = ttk.Button(
             btn_frame,
-            text="Stop (F7)",
+            text="Dừng (F7)",
             command=self._on_stop,
             width=15,
             state=tk.DISABLED
         )
         self.stop_btn.pack(side=tk.LEFT)
 
-        settings_frame = ttk.LabelFrame(self.frame, text="Settings", padding="15")
+        settings_frame = ttk.LabelFrame(self.frame, text="Thiết lập", padding="15")
         settings_frame.pack(fill=tk.X, pady=(0, 10))
 
         # Play Mode selector
@@ -86,7 +86,7 @@ class ControlTab:
         speed_frame = ttk.Frame(settings_frame)
         speed_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(speed_frame, text="Move delay (ms):").pack(side=tk.LEFT)
+        ttk.Label(speed_frame, text="Delay nước đi (ms):").pack(side=tk.LEFT)
 
         self.speed_var = tk.IntVar(value=self.main_window.config.get("move_delay", 500))
         self.speed_scale = ttk.Scale(
@@ -135,21 +135,21 @@ class ControlTab:
         self.new_game_delay_label = ttk.Label(delay_frame, text="1000", width=5)
         self.new_game_delay_label.pack(side=tk.LEFT)
 
-        status_frame = ttk.LabelFrame(self.frame, text="Statistics", padding="15")
+        status_frame = ttk.LabelFrame(self.frame, text="Thống kê", padding="15")
         status_frame.pack(fill=tk.X, pady=(0, 10))
 
         stats_grid = ttk.Frame(status_frame)
         stats_grid.pack(fill=tk.X)
 
-        ttk.Label(stats_grid, text="Status:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.status_value = ttk.Label(stats_grid, text="Stopped", foreground="red")
+        ttk.Label(stats_grid, text="Trạng thái:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.status_value = ttk.Label(stats_grid, text="Đã dừng", foreground="red")
         self.status_value.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=2)
 
-        ttk.Label(stats_grid, text="Moves made:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Label(stats_grid, text="Số nước đi:").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.moves_value = ttk.Label(stats_grid, text="0")
         self.moves_value.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=2)
 
-        ttk.Label(stats_grid, text="Running time:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        ttk.Label(stats_grid, text="Thời gian chạy:").grid(row=2, column=0, sticky=tk.W, pady=2)
         self.time_value = ttk.Label(stats_grid, text="00:00:00")
         self.time_value.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=2)
 
@@ -158,7 +158,7 @@ class ControlTab:
             self.start_btn.config(state=tk.DISABLED)
             self.pause_btn.config(state=tk.NORMAL)
             self.stop_btn.config(state=tk.NORMAL)
-            self.status_value.config(text="Running", foreground="green")
+            self.status_value.config(text="Đang chạy", foreground="green")
 
             self.start_time = time.time()
             self.move_count = 0
@@ -169,19 +169,19 @@ class ControlTab:
         self.main_window.pause_bot()
 
         if self.main_window.bot_paused:
-            self.pause_btn.config(text="Resume (F6)")
-            self.status_value.config(text="Paused", foreground="orange")
+            self.pause_btn.config(text="Tiếp tục (F6)")
+            self.status_value.config(text="Tạm dừng", foreground="orange")
         else:
-            self.pause_btn.config(text="Pause (F6)")
-            self.status_value.config(text="Running", foreground="green")
+            self.pause_btn.config(text="Tạm dừng (F6)")
+            self.status_value.config(text="Đang chạy", foreground="green")
 
     def _on_stop(self):
         self.main_window.stop_bot()
 
         self.start_btn.config(state=tk.NORMAL)
-        self.pause_btn.config(state=tk.DISABLED, text="Pause (F6)")
+        self.pause_btn.config(state=tk.DISABLED, text="Tạm dừng (F6)")
         self.stop_btn.config(state=tk.DISABLED)
-        self.status_value.config(text="Stopped", foreground="red")
+        self.status_value.config(text="Đã dừng", foreground="red")
 
         self.timer_running = False
 

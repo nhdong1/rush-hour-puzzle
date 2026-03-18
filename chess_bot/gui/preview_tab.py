@@ -31,7 +31,7 @@ class PreviewTab:
         self._setup_ui()
 
     def _setup_ui(self):
-        preview_frame = ttk.LabelFrame(self.frame, text="Detection Preview", padding="10")
+        preview_frame = ttk.LabelFrame(self.frame, text="Xem trước phát hiện", padding="10")
         preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
         self.preview_canvas = tk.Canvas(preview_frame, bg="#2b2b2b", width=500, height=400)
@@ -45,14 +45,14 @@ class PreviewTab:
 
         self.test_btn = ttk.Button(
             btn_frame,
-            text="Test Detection",
+            text="Kiểm tra phát hiện",
             command=self._test_detection
         )
         self.test_btn.pack(side=tk.LEFT, padx=(0, 10))
 
         self.live_btn = ttk.Button(
             btn_frame,
-            text="Start Live Preview",
+            text="Bắt đầu xem trực tiếp",
             command=self._toggle_live_preview
         )
         self.live_btn.pack(side=tk.LEFT, padx=(0, 10))
@@ -60,7 +60,7 @@ class PreviewTab:
         refresh_frame = ttk.Frame(btn_frame)
         refresh_frame.pack(side=tk.LEFT, padx=(20, 0))
 
-        ttk.Label(refresh_frame, text="Refresh rate:").pack(side=tk.LEFT)
+        ttk.Label(refresh_frame, text="Tỉ lệ làm mới:").pack(side=tk.LEFT)
         self.refresh_var = tk.IntVar(value=500)
         self.refresh_scale = ttk.Scale(
             refresh_frame,
@@ -75,12 +75,12 @@ class PreviewTab:
         self.refresh_label = ttk.Label(refresh_frame, text="500ms")
         self.refresh_label.pack(side=tk.LEFT)
 
-        status_frame = ttk.LabelFrame(control_frame, text="Detection Status", padding="5")
+        status_frame = ttk.LabelFrame(control_frame, text="Trạng thái phát hiện", padding="5")
         status_frame.pack(fill=tk.X)
 
         self.status_label = ttk.Label(
             status_frame,
-            text="Board: -- | Cells: -- | Pieces: -- | Rook: --"
+            text="Bàn cờ: -- | Ô: -- | Quân: -- | Xe: --"
         )
         self.status_label.pack(fill=tk.X)
 
@@ -128,7 +128,7 @@ class PreviewTab:
         region = config.get("game_region")
 
         if not region:
-            self._show_error("No game region selected.\nGo to Setup tab to select a region.")
+            self._show_error("Chưa chọn vùng chơi.\nVào tab Cài đặt để chọn vùng.")
             self._update_status(board_ok=False)
             return
 
@@ -136,7 +136,7 @@ class PreviewTab:
         dark_color = config.get("dark_cell_color")
 
         if not light_color or not dark_color:
-            self._show_error("Cell colors not configured.\nGo to Setup tab to pick colors.")
+            self._show_error("Chưa cấu hình màu ô.\nVào tab Cài đặt để chọn màu.")
             self._update_status(board_ok=False)
             return
 
@@ -144,7 +144,7 @@ class PreviewTab:
             screen_capture, board_detector, piece_detector = self._get_detectors()
 
             if screen_capture is None:
-                self._show_error("Failed to initialize screen capture.")
+                self._show_error("Khởi tạo chụp màn hình thất bại.")
                 self._update_status(board_ok=False)
                 return
 
@@ -157,7 +157,7 @@ class PreviewTab:
             screenshot = screen_capture.capture()
 
             if screenshot is None:
-                self._show_error("Failed to capture screen.")
+                self._show_error("Chụp màn hình thất bại.")
                 self._update_status(board_ok=False)
                 return
 
@@ -196,9 +196,9 @@ class PreviewTab:
             )
 
         except Exception as e:
-            self._show_error(f"Detection error:\n{str(e)}")
+            self._show_error(f"Lỗi phát hiện:\n{str(e)}")
             self._update_status(board_ok=False)
-            self.main_window.log(f"Preview error: {str(e)}")
+            self.main_window.log(f"Lỗi xem trước: {str(e)}")
 
     def _render_preview(self, screenshot, cells, board_state, rook_pos, danger_cells=None):
         screenshot_rgb = cv2.cvtColor(screenshot, cv2.COLOR_BGR2RGB)
@@ -389,10 +389,10 @@ class PreviewTab:
         )
 
     def _update_status(self, board_ok=False, cell_count=0, piece_count=0, rook_pos=None):
-        board_status = "OK" if board_ok else "FAIL"
+        board_status = "OK" if board_ok else "LỖI"
         rook_text = f"({rook_pos[0]}, {rook_pos[1]})" if rook_pos else "--"
 
-        status_text = f"Board: {board_status} | Cells: {cell_count} | Pieces: {piece_count} | Rook: {rook_text}"
+        status_text = f"Bàn cờ: {board_status} | Ô: {cell_count} | Quân: {piece_count} | Xe: {rook_text}"
         self.status_label.config(text=status_text)
 
     def _toggle_live_preview(self):
@@ -403,20 +403,20 @@ class PreviewTab:
 
     def _start_live_preview(self):
         self.live_preview_active = True
-        self.live_btn.config(text="Stop Live Preview")
+        self.live_btn.config(text="Dừng xem trực tiếp")
         self._reset_detectors()
         self._schedule_update()
-        self.main_window.log("Live preview started")
+        self.main_window.log("Đã bắt đầu xem trực tiếp")
 
     def _stop_live_preview(self):
         self.live_preview_active = False
-        self.live_btn.config(text="Start Live Preview")
+        self.live_btn.config(text="Bắt đầu xem trực tiếp")
 
         if self.update_job:
             self.main_window.root.after_cancel(self.update_job)
             self.update_job = None
 
-        self.main_window.log("Live preview stopped")
+        self.main_window.log("Đã dừng xem trực tiếp")
 
     def _schedule_update(self):
         if not self.live_preview_active:

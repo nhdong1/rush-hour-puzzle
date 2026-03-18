@@ -27,7 +27,7 @@ from .preview_tab import PreviewTab
 class MainWindow:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Chess Bot - Auto Player")
+        self.root.title("Chess Bot - Tự động chơi cờ")
         self.root.geometry("800x600")
         self.root.minsize(700, 500)
 
@@ -51,15 +51,15 @@ class MainWindow:
         self.log_tab = LogTab(self.notebook, self)
         self.preview_tab = PreviewTab(self.notebook, self)
 
-        self.notebook.add(self.setup_tab.frame, text="Setup")
-        self.notebook.add(self.control_tab.frame, text="Control")
-        self.notebook.add(self.log_tab.frame, text="Log")
-        self.notebook.add(self.preview_tab.frame, text="Detection Preview")
+        self.notebook.add(self.setup_tab.frame, text="Cài đặt")
+        self.notebook.add(self.control_tab.frame, text="Điều khiển")
+        self.notebook.add(self.log_tab.frame, text="Nhật ký")
+        self.notebook.add(self.preview_tab.frame, text="Xem trước")
 
         status_frame = ttk.Frame(main_frame)
         status_frame.pack(fill=tk.X, pady=(10, 0))
 
-        self.status_label = ttk.Label(status_frame, text="Status: Ready")
+        self.status_label = ttk.Label(status_frame, text="Trạng thái: Sẵn sàng")
         self.status_label.pack(side=tk.LEFT)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -74,14 +74,14 @@ class MainWindow:
         self.root.destroy()
 
     def update_status(self, text):
-        self.status_label.config(text=f"Status: {text}")
+        self.status_label.config(text=f"Trạng thái: {text}")
 
     def log(self, message):
         self.log_tab.add_log(message)
 
     def save_current_config(self):
         save_config(self.config)
-        self.log("Configuration saved")
+        self.log("Đã lưu cấu hình")
 
     def start_bot(self):
         if not self._validate_config():
@@ -91,28 +91,28 @@ class MainWindow:
         self.bot_paused = False
         self.bot_thread = threading.Thread(target=self._bot_loop, daemon=True)
         self.bot_thread.start()
-        self.update_status("Running")
-        self.log("Bot started")
+        self.update_status("Đang chạy")
+        self.log("Bot đã bắt đầu")
         return True
 
     def stop_bot(self):
         self.bot_running = False
         self.bot_paused = False
-        self.update_status("Stopped")
-        self.log("Bot stopped")
+        self.update_status("Đã dừng")
+        self.log("Bot đã dừng")
 
     def pause_bot(self):
         self.bot_paused = not self.bot_paused
-        status = "Paused" if self.bot_paused else "Running"
+        status = "Tạm dừng" if self.bot_paused else "Đang chạy"
         self.update_status(status)
-        self.log(f"Bot {status.lower()}")
+        self.log(f"Bot {'đã tạm dừng' if self.bot_paused else 'đang chạy'}")
 
     def _validate_config(self):
         if not self.config.get("game_region"):
-            messagebox.showerror("Error", "Please select game region first")
+            messagebox.showerror("Lỗi", "Vui lòng chọn vùng chơi trước")
             return False
         if not self.config.get("light_cell_color") or not self.config.get("dark_cell_color"):
-            messagebox.showerror("Error", "Please pick cell colors first")
+            messagebox.showerror("Lỗi", "Vui lòng chọn màu ô cờ trước")
             return False
         return True
 
@@ -144,7 +144,7 @@ class MainWindow:
         no_rook_count = 0
         max_no_rook_retries = 3
 
-        self._safe_log(f"Bot loop started - Mode: {'Tự sát' if play_mode == 'suicide' else 'Bình thường'}")
+        self._safe_log(f"Bắt đầu vòng lặp bot - Chế độ: {'Tự sát' if play_mode == 'suicide' else 'Bình thường'}")
 
         while self.bot_running:
             if self.bot_paused:
@@ -155,18 +155,18 @@ class MainWindow:
             current_mode = self.config.get("play_mode", "normal")
             if ai_player.play_mode != current_mode:
                 ai_player.set_play_mode(current_mode)
-                self._safe_log(f"Mode changed: {'Tự sát' if current_mode == 'suicide' else 'Bình thường'}")
+                self._safe_log(f"Đã đổi chế độ: {'Tự sát' if current_mode == 'suicide' else 'Bình thường'}")
 
             try:
                 screenshot = capture.capture()
                 if screenshot is None:
-                    self._safe_log("Failed to capture screen")
+                    self._safe_log("Chụp màn hình thất bại")
                     time.sleep(1)
                     continue
 
                 cells = board_detector.detect_cells(screenshot)
                 if cells is None:
-                    self._safe_log("Failed to detect board")
+                    self._safe_log("Không phát hiện được bàn cờ")
                     time.sleep(1)
                     continue
 
@@ -176,7 +176,7 @@ class MainWindow:
                     no_rook_count += 1
 
                     if no_rook_count >= max_no_rook_retries:
-                        self._safe_log("Player rook not found - checking for game over")
+                        self._safe_log("Không tìm thấy xe - kiểm tra kết thúc game")
 
                         # Check if auto new game is enabled
                         auto_new_game = self.config.get("auto_new_game", False)
@@ -192,7 +192,7 @@ class MainWindow:
                                 ai_player.reset()  # Reset AI state
                                 continue
 
-                        self._safe_log("Game over or rook not detected - waiting...")
+                        self._safe_log("Game kết thúc hoặc không phát hiện xe - đang chờ...")
                         time.sleep(2)
                         continue
                     else:
@@ -208,10 +208,10 @@ class MainWindow:
 
                 current_in_danger = rook_pos in danger_cells
                 if current_in_danger:
-                    self._safe_log(f"WARNING: Rook at {rook_pos} is in danger!")
+                    self._safe_log(f"CẢNH BÁO: Xe tại {rook_pos} đang bị đe dọa!")
 
                 if not valid_moves:
-                    self._safe_log("No valid moves available")
+                    self._safe_log("Không có nước đi hợp lệ")
                     time.sleep(0.5)
                     continue
 
@@ -227,11 +227,11 @@ class MainWindow:
                     abs_x = region[0] + click_x
                     abs_y = region[1] + click_y
 
-                    action = "Capture" if is_capture else "Move"
+                    action = "Ăn" if is_capture else "Di chuyển"
                     target_in_danger = (target_row, target_col) in danger_cells
-                    danger_warning = " [DANGER!]" if target_in_danger else ""
+                    danger_warning = " [NGUY HIỂM!]" if target_in_danger else ""
 
-                    self._safe_log(f"{action} to ({target_row}, {target_col}){danger_warning}")
+                    self._safe_log(f"{action} đến ({target_row}, {target_col}){danger_warning}")
 
                     mouse.click(abs_x, abs_y)
                     move_count += 1
@@ -243,12 +243,12 @@ class MainWindow:
                 time.sleep(delay)
 
             except Exception as e:
-                self._safe_log(f"Error: {str(e)}")
+                self._safe_log(f"Lỗi: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 time.sleep(1)
 
-        self._safe_log("Bot loop ended")
+        self._safe_log("Vòng lặp bot đã kết thúc")
 
     def _handle_game_over(self, capture, button_detector, mouse, delay):
         """
@@ -293,7 +293,7 @@ class MainWindow:
                 abs_x = region[0] + x
                 abs_y = region[1] + y
 
-                self._safe_log(f"Detected {button_name} (conf: {confidence:.2f}) - clicking")
+                self._safe_log(f"Phát hiện {button_name} (conf: {confidence:.2f}) - đang nhấp")
 
                 # Click the button
                 mouse.click(abs_x, abs_y)
@@ -303,7 +303,7 @@ class MainWindow:
                 time.sleep(delay)
 
         if clicked_any:
-            self._safe_log("Auto new game - buttons clicked, waiting for new game to start...")
+            self._safe_log("Tự động chơi mới - đã nhấp nút, đang chờ game mới bắt đầu...")
             time.sleep(delay * 2)  # Extra wait for game to load
 
         return clicked_any

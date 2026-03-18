@@ -49,7 +49,7 @@ class TemplateCaptureDialog:
 
         # Create main dialog
         self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Capture Template")
+        self.dialog.title("Chụp Template")
         self.dialog.geometry("500x400")
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -103,7 +103,7 @@ class TemplateCaptureDialog:
         self.status_label.pack(side=tk.LEFT, padx=10)
 
         # Preview
-        preview_frame = ttk.LabelFrame(main_frame, text="Preview", padding="10")
+        preview_frame = ttk.LabelFrame(main_frame, text="Xem trước", padding="10")
         preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
         self.preview_canvas = tk.Canvas(preview_frame, bg="gray", width=200, height=150)
