@@ -122,6 +122,7 @@ class MainWindow:
         from core.piece_detector import PieceDetector
         from core.ai_player import AIPlayer
         from core.mouse_controller import MouseController
+        from core.button_detector import ButtonDetector
 
         capture = ScreenCapture(self.config["game_region"])
         board_detector = BoardDetector(
@@ -132,19 +133,29 @@ class MainWindow:
 
         templates_path = get_templates_path()
         piece_detector = PieceDetector(templates_path)
-        ai_player = AIPlayer()
+        button_detector = ButtonDetector(templates_path)
+
+        # Get play mode from config
+        play_mode = self.config.get("play_mode", "normal")
+        ai_player = AIPlayer(play_mode=play_mode)
         mouse = MouseController()
 
         move_count = 0
         no_rook_count = 0
         max_no_rook_retries = 3
 
-        self._safe_log("Bot loop started")
+        self._safe_log(f"Bot loop started - Mode: {'Tự sát' if play_mode == 'suicide' else 'Bình thường'}")
 
         while self.bot_running:
             if self.bot_paused:
                 time.sleep(0.1)
                 continue
+
+            # Update play mode dynamically (in case user changed it)
+            current_mode = self.config.get("play_mode", "normal")
+            if ai_player.play_mode != current_mode:
+                ai_player.set_play_mode(current_mode)
+                self._safe_log(f"Mode changed: {'Tự sát' if current_mode == 'suicide' else 'Bình thường'}")
 
             try:
                 screenshot = capture.capture()
@@ -166,6 +177,20 @@ class MainWindow:
 
                     if no_rook_count >= max_no_rook_retries:
                         self._safe_log("Player rook not found - checking for game over")
+
+                        # Check if auto new game is enabled
+                        auto_new_game = self.config.get("auto_new_game", False)
+                        new_game_delay = self.config.get("new_game_delay", 1000) / 1000.0
+
+                        if auto_new_game:
+                            # Try to detect and click buttons
+                            game_over_handled = self._handle_game_over(
+                                capture, button_detector, mouse, new_game_delay
+                            )
+                            if game_over_handled:
+                                no_rook_count = 0  # Reset counter
+                                ai_player.reset()  # Reset AI state
+                                continue
 
                         self._safe_log("Game over or rook not detected - waiting...")
                         time.sleep(2)
@@ -224,6 +249,64 @@ class MainWindow:
                 time.sleep(1)
 
         self._safe_log("Bot loop ended")
+
+    def _handle_game_over(self, capture, button_detector, mouse, delay):
+        """
+        Handle game over by detecting and clicking buttons for new game.
+
+        Args:
+            capture: ScreenCapture instance
+            button_detector: ButtonDetector instance
+            mouse: MouseController instance
+            delay: Delay between clicks in seconds
+
+        Returns:
+            True if any button was clicked, False otherwise
+        """
+        region = self.config["game_region"]
+        clicked_any = False
+
+        # Button click sequence
+        button_sequence = [
+            "game_over_popup",  # First check if popup exists
+            "end_game_button",
+            "enter_game_button",
+            "start_play_button",
+        ]
+
+        for button_name in button_sequence:
+            if not self.bot_running:
+                return clicked_any
+
+            # Take fresh screenshot for each button
+            screenshot = capture.capture()
+            if screenshot is None:
+                continue
+
+            # Detect button
+            result = button_detector.detect_button(screenshot, button_name)
+
+            if result is not None:
+                x, y, confidence = result
+
+                # Convert to absolute coordinates
+                abs_x = region[0] + x
+                abs_y = region[1] + y
+
+                self._safe_log(f"Detected {button_name} (conf: {confidence:.2f}) - clicking")
+
+                # Click the button
+                mouse.click(abs_x, abs_y)
+                clicked_any = True
+
+                # Wait for UI to respond
+                time.sleep(delay)
+
+        if clicked_any:
+            self._safe_log("Auto new game - buttons clicked, waiting for new game to start...")
+            time.sleep(delay * 2)  # Extra wait for game to load
+
+        return clicked_any
 
     def _safe_log(self, message):
         try:

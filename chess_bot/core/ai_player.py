@@ -16,14 +16,23 @@ BOARD_SIZE = 8
 MAX_DEPTH = 3  # Độ sâu tối đa cho minimax
 INF = float('inf')
 
+# Play modes
+PLAY_MODE_NORMAL = "normal"
+PLAY_MODE_SUICIDE = "suicide"
+
 
 class AIPlayer:
-    def __init__(self, depth: int = MAX_DEPTH):
+    def __init__(self, depth: int = MAX_DEPTH, play_mode: str = PLAY_MODE_NORMAL):
         self.last_position = None
         self.position_history = []
         self.safety_threshold = 0.7
         self.repeat_move_count = 0
         self.search_depth = depth
+        self.play_mode = play_mode  # "normal" or "suicide"
+
+    def set_play_mode(self, mode: str):
+        """Set play mode: 'normal' or 'suicide'"""
+        self.play_mode = mode
 
     def get_valid_moves(self, rook_pos: Tuple[int, int], board_state: List[List]) -> List[Tuple[int, int, bool]]:
         if rook_pos is None:
@@ -170,8 +179,13 @@ class AIPlayer:
             else:
                 safe_moves.append((move, new_board, captured_piece))
 
-        # Ưu tiên nước an toàn, chỉ xét nước tự sát khi không còn lựa chọn
-        moves_to_evaluate = safe_moves if safe_moves else suicide_moves
+        # Chọn thứ tự ưu tiên dựa trên play mode
+        if self.play_mode == PLAY_MODE_SUICIDE:
+            # Suicide mode: ưu tiên nước tự sát, chỉ xét an toàn khi không còn nước tự sát
+            moves_to_evaluate = suicide_moves if suicide_moves else safe_moves
+        else:
+            # Normal mode: ưu tiên nước an toàn
+            moves_to_evaluate = safe_moves if safe_moves else suicide_moves
 
         best_move = None
         best_score = -INF
@@ -190,9 +204,15 @@ class AIPlayer:
                 is_maximizing=False
             )
 
-            # Cộng thêm điểm ăn quân ngay lập tức
+            # Điểm ăn quân ngay lập tức
             if is_capture and captured_piece:
-                score += PIECE_VALUES.get(captured_piece.type, 1) * 20
+                capture_value = PIECE_VALUES.get(captured_piece.type, 1) * 20
+                if self.play_mode == PLAY_MODE_SUICIDE:
+                    # Suicide mode: phạt điểm khi ăn quân (kéo dài game)
+                    score -= capture_value
+                else:
+                    # Normal mode: thưởng điểm khi ăn quân
+                    score += capture_value
 
             if score > best_score:
                 best_score = score
@@ -213,7 +233,10 @@ class AIPlayer:
         # Kiểm tra game over
         danger_cells = self.get_danger_cells(board_state)
         if rook_pos in danger_cells:
-            return -10000 if is_maximizing else -10000  # Rook bị ăn = thua
+            if self.play_mode == PLAY_MODE_SUICIDE:
+                return 10000  # Suicide mode: bị ăn = thắng
+            else:
+                return -10000  # Normal mode: bị ăn = thua
 
         # Đạt độ sâu tối đa
         if depth <= 0:
@@ -240,9 +263,13 @@ class AIPlayer:
                     depth - 1, alpha, beta, False
                 )
 
-                # Cộng điểm ăn quân
+                # Điểm ăn quân
                 if is_capture and captured:
-                    eval_score += PIECE_VALUES.get(captured.type, 1) * 10
+                    capture_value = PIECE_VALUES.get(captured.type, 1) * 10
+                    if self.play_mode == PLAY_MODE_SUICIDE:
+                        eval_score -= capture_value  # Phạt khi ăn quân
+                    else:
+                        eval_score += capture_value  # Thưởng khi ăn quân
 
                 max_eval = max(max_eval, eval_score)
                 alpha = max(alpha, eval_score)
@@ -266,7 +293,10 @@ class AIPlayer:
 
                 # Kiểm tra nếu enemy ăn được rook
                 if to_pos == rook_pos:
-                    return -10000  # Player thua
+                    if self.play_mode == PLAY_MODE_SUICIDE:
+                        return 10000  # Suicide mode: bị ăn = thắng
+                    else:
+                        return -10000  # Normal mode: bị ăn = thua
 
                 eval_score = self._minimax(
                     new_board, rook_pos,
@@ -286,23 +316,44 @@ class AIPlayer:
         """Đánh giá trạng thái bàn cờ."""
         score = 0.0
 
-        # Phạt nếu đang ở ô nguy hiểm
-        if rook_pos in danger_cells:
-            score -= 500
+        if self.play_mode == PLAY_MODE_SUICIDE:
+            # === SUICIDE MODE: Đảo ngược logic ===
+            # Thưởng nếu ở ô nguy hiểm (sắp bị ăn = tốt)
+            if rook_pos in danger_cells:
+                score += 500
 
-        # Số ô trốn an toàn
-        escape_routes = self._count_safe_escapes(rook_pos[0], rook_pos[1], board_state, danger_cells)
-        score += escape_routes * 15
+            # Phạt nếu có nhiều đường trốn (càng ít đường trốn càng tốt)
+            escape_routes = self._count_safe_escapes(rook_pos[0], rook_pos[1], board_state, danger_cells)
+            score -= escape_routes * 15
 
-        # Ưu tiên trung tâm
-        center_dist = abs(rook_pos[0] - 3.5) + abs(rook_pos[1] - 3.5)
-        score += (7 - center_dist) * 2
+            # Phạt nếu ở trung tâm (ra góc dễ bị dồn hơn)
+            center_dist = abs(rook_pos[0] - 3.5) + abs(rook_pos[1] - 3.5)
+            score += center_dist * 2
 
-        # Phạt lặp vị trí
-        if self.last_position and rook_pos == self.last_position:
-            score -= 5
-        position_count = self.position_history.count(rook_pos)
-        score -= position_count * 2.5
+            # Vẫn phạt lặp vị trí để tránh kéo dài game
+            if self.last_position and rook_pos == self.last_position:
+                score -= 5
+            position_count = self.position_history.count(rook_pos)
+            score -= position_count * 2.5
+        else:
+            # === NORMAL MODE: Logic gốc ===
+            # Phạt nếu đang ở ô nguy hiểm
+            if rook_pos in danger_cells:
+                score -= 500
+
+            # Số ô trốn an toàn
+            escape_routes = self._count_safe_escapes(rook_pos[0], rook_pos[1], board_state, danger_cells)
+            score += escape_routes * 15
+
+            # Ưu tiên trung tâm
+            center_dist = abs(rook_pos[0] - 3.5) + abs(rook_pos[1] - 3.5)
+            score += (7 - center_dist) * 2
+
+            # Phạt lặp vị trí
+            if self.last_position and rook_pos == self.last_position:
+                score -= 5
+            position_count = self.position_history.count(rook_pos)
+            score -= position_count * 2.5
 
         return score
 
