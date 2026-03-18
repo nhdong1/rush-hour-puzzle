@@ -14,6 +14,10 @@ def get_base_path():
 
 BASE_PATH = get_base_path()
 
+# Play modes
+PLAY_MODE_NORMAL = "normal"
+PLAY_MODE_SUICIDE = "suicide"
+
 default_config = {
     "game_region": None,
     "light_cell_color": None,
@@ -21,6 +25,10 @@ default_config = {
     "color_tolerance": 30,
     "move_delay": 500,
     "templates_path": "templates/",
+    # New settings
+    "play_mode": PLAY_MODE_NORMAL,  # "normal" or "suicide"
+    "auto_new_game": False,
+    "new_game_delay": 1000,  # ms
 }
 
 

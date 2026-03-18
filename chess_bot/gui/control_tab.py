@@ -14,58 +14,80 @@ class ControlTab:
     def __init__(self, parent, main_window):
         self.main_window = main_window
         self.frame = ttk.Frame(parent, padding="10")
-        
+
         self.start_time = None
         self.move_count = 0
         self.timer_running = False
-        
+
         self._last_hotkey_time = 0
         self._hotkey_debounce_ms = 300
-        
+
         self._setup_ui()
         self._setup_hotkeys()
-        
+
     def _setup_ui(self):
-        control_frame = ttk.LabelFrame(self.frame, text="Bot Control", padding="15")
+        control_frame = ttk.LabelFrame(self.frame, text="Điều khiển Bot", padding="15")
         control_frame.pack(fill=tk.X, pady=(0, 10))
-        
+
         btn_frame = ttk.Frame(control_frame)
         btn_frame.pack(fill=tk.X, pady=(0, 10))
-        
+
         self.start_btn = ttk.Button(
             btn_frame,
-            text="Start (F5)",
+            text="Bắt đầu (F5)",
             command=self._on_start,
             width=15
         )
         self.start_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
+
         self.pause_btn = ttk.Button(
             btn_frame,
-            text="Pause (F6)",
+            text="Tạm dừng (F6)",
             command=self._on_pause,
             width=15,
             state=tk.DISABLED
         )
         self.pause_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
+
         self.stop_btn = ttk.Button(
             btn_frame,
-            text="Stop (F7)",
+            text="Dừng (F7)",
             command=self._on_stop,
             width=15,
             state=tk.DISABLED
         )
         self.stop_btn.pack(side=tk.LEFT)
-        
-        settings_frame = ttk.LabelFrame(self.frame, text="Settings", padding="15")
+
+        settings_frame = ttk.LabelFrame(self.frame, text="Thiết lập", padding="15")
         settings_frame.pack(fill=tk.X, pady=(0, 10))
-        
+
+        # Play Mode selector
+        mode_frame = ttk.Frame(settings_frame)
+        mode_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(mode_frame, text="Chế độ chơi:").pack(side=tk.LEFT)
+
+        self.mode_var = tk.StringVar(value=self.main_window.config.get("play_mode", "normal"))
+        self.mode_combo = ttk.Combobox(
+            mode_frame,
+            textvariable=self.mode_var,
+            values=["normal", "suicide"],
+            state="readonly",
+            width=15
+        )
+        self.mode_combo.pack(side=tk.LEFT, padx=10)
+        self.mode_combo.bind("<<ComboboxSelected>>", self._on_mode_change)
+
+        # Display label for mode
+        self.mode_display = ttk.Label(mode_frame, text=self._get_mode_display_text())
+        self.mode_display.pack(side=tk.LEFT, padx=5)
+
+        # Move delay slider
         speed_frame = ttk.Frame(settings_frame)
         speed_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Label(speed_frame, text="Move delay (ms):").pack(side=tk.LEFT)
-        
+
+        ttk.Label(speed_frame, text="Delay nước đi (ms):").pack(side=tk.LEFT)
+
         self.speed_var = tk.IntVar(value=self.main_window.config.get("move_delay", 500))
         self.speed_scale = ttk.Scale(
             speed_frame,
@@ -76,82 +98,115 @@ class ControlTab:
             command=self._on_speed_change
         )
         self.speed_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10)
-        
+
         self.speed_label = ttk.Label(speed_frame, text="500", width=5)
         self.speed_label.pack(side=tk.LEFT)
-        
-        status_frame = ttk.LabelFrame(self.frame, text="Statistics", padding="15")
+
+        # Auto New Game settings
+        auto_frame = ttk.Frame(settings_frame)
+        auto_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.auto_new_game_var = tk.BooleanVar(value=self.main_window.config.get("auto_new_game", False))
+        self.auto_new_game_check = ttk.Checkbutton(
+            auto_frame,
+            text="Tự động chơi ván mới",
+            variable=self.auto_new_game_var,
+            command=self._on_auto_new_game_change
+        )
+        self.auto_new_game_check.pack(side=tk.LEFT)
+
+        # New game delay slider
+        delay_frame = ttk.Frame(settings_frame)
+        delay_frame.pack(fill=tk.X, pady=(0, 5))
+
+        ttk.Label(delay_frame, text="Delay ván mới (ms):").pack(side=tk.LEFT)
+
+        self.new_game_delay_var = tk.IntVar(value=self.main_window.config.get("new_game_delay", 1000))
+        self.new_game_delay_scale = ttk.Scale(
+            delay_frame,
+            from_=500,
+            to=5000,
+            variable=self.new_game_delay_var,
+            orient=tk.HORIZONTAL,
+            command=self._on_new_game_delay_change
+        )
+        self.new_game_delay_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10)
+
+        self.new_game_delay_label = ttk.Label(delay_frame, text="1000", width=5)
+        self.new_game_delay_label.pack(side=tk.LEFT)
+
+        status_frame = ttk.LabelFrame(self.frame, text="Thống kê", padding="15")
         status_frame.pack(fill=tk.X, pady=(0, 10))
-        
+
         stats_grid = ttk.Frame(status_frame)
         stats_grid.pack(fill=tk.X)
-        
-        ttk.Label(stats_grid, text="Status:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.status_value = ttk.Label(stats_grid, text="Stopped", foreground="red")
+
+        ttk.Label(stats_grid, text="Trạng thái:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.status_value = ttk.Label(stats_grid, text="Đã dừng", foreground="red")
         self.status_value.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=2)
-        
-        ttk.Label(stats_grid, text="Moves made:").grid(row=1, column=0, sticky=tk.W, pady=2)
+
+        ttk.Label(stats_grid, text="Số nước đi:").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.moves_value = ttk.Label(stats_grid, text="0")
         self.moves_value.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=2)
-        
-        ttk.Label(stats_grid, text="Running time:").grid(row=2, column=0, sticky=tk.W, pady=2)
+
+        ttk.Label(stats_grid, text="Thời gian chạy:").grid(row=2, column=0, sticky=tk.W, pady=2)
         self.time_value = ttk.Label(stats_grid, text="00:00:00")
         self.time_value.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=2)
-        
+
     def _on_start(self):
         if self.main_window.start_bot():
             self.start_btn.config(state=tk.DISABLED)
             self.pause_btn.config(state=tk.NORMAL)
             self.stop_btn.config(state=tk.NORMAL)
-            self.status_value.config(text="Running", foreground="green")
-            
+            self.status_value.config(text="Đang chạy", foreground="green")
+
             self.start_time = time.time()
             self.move_count = 0
             self.timer_running = True
             self._update_timer()
-            
+
     def _on_pause(self):
         self.main_window.pause_bot()
-        
+
         if self.main_window.bot_paused:
-            self.pause_btn.config(text="Resume (F6)")
-            self.status_value.config(text="Paused", foreground="orange")
+            self.pause_btn.config(text="Tiếp tục (F6)")
+            self.status_value.config(text="Tạm dừng", foreground="orange")
         else:
-            self.pause_btn.config(text="Pause (F6)")
-            self.status_value.config(text="Running", foreground="green")
-            
+            self.pause_btn.config(text="Tạm dừng (F6)")
+            self.status_value.config(text="Đang chạy", foreground="green")
+
     def _on_stop(self):
         self.main_window.stop_bot()
-        
+
         self.start_btn.config(state=tk.NORMAL)
-        self.pause_btn.config(state=tk.DISABLED, text="Pause (F6)")
+        self.pause_btn.config(state=tk.DISABLED, text="Tạm dừng (F6)")
         self.stop_btn.config(state=tk.DISABLED)
-        self.status_value.config(text="Stopped", foreground="red")
-        
+        self.status_value.config(text="Đã dừng", foreground="red")
+
         self.timer_running = False
-        
+
     def _on_speed_change(self, value):
         int_value = int(float(value))
         self.speed_label.config(text=str(int_value))
         self.main_window.config["move_delay"] = int_value
-        
+
     def _update_timer(self):
         if not self.timer_running:
             return
-            
+
         if self.start_time and not self.main_window.bot_paused:
             elapsed = int(time.time() - self.start_time)
             hours = elapsed // 3600
             minutes = (elapsed % 3600) // 60
             seconds = elapsed % 60
             self.time_value.config(text=f"{hours:02d}:{minutes:02d}:{seconds:02d}")
-            
+
         self.frame.after(1000, self._update_timer)
-        
+
     def update_move_count(self, count):
         self.move_count = count
         self.moves_value.config(text=str(count))
-        
+
     def _setup_hotkeys(self):
         if PYNPUT_AVAILABLE:
             self._setup_global_hotkeys()
@@ -161,17 +216,17 @@ class ControlTab:
             root.bind("<F5>", self._hotkey_start)
             root.bind("<F6>", self._hotkey_pause)
             root.bind("<F7>", self._hotkey_stop)
-            
+
     def _setup_global_hotkeys(self):
         self.hotkey_listener = None
-        
+
         def on_press(key):
             try:
                 current_time = time.time() * 1000
                 if current_time - self._last_hotkey_time < self._hotkey_debounce_ms:
                     return
                 self._last_hotkey_time = current_time
-                
+
                 if key == keyboard.Key.f5:
                     self.main_window.root.after(0, self._hotkey_start)
                 elif key == keyboard.Key.f6:
@@ -180,23 +235,50 @@ class ControlTab:
                     self.main_window.root.after(0, self._hotkey_stop)
             except Exception:
                 pass
-                
+
         self.hotkey_listener = keyboard.Listener(on_press=on_press)
         self.hotkey_listener.daemon = True
         self.hotkey_listener.start()
-        
+
     def stop_hotkey_listener(self):
         if hasattr(self, 'hotkey_listener') and self.hotkey_listener:
             self.hotkey_listener.stop()
-        
+
     def _hotkey_start(self, event=None):
         if str(self.start_btn["state"]) != "disabled":
             self._on_start()
-            
+
     def _hotkey_pause(self, event=None):
         if str(self.pause_btn["state"]) != "disabled":
             self._on_pause()
-            
+
     def _hotkey_stop(self, event=None):
         if str(self.stop_btn["state"]) != "disabled":
             self._on_stop()
+
+    def _get_mode_display_text(self):
+        """Get display text for current play mode"""
+        mode = self.main_window.config.get("play_mode", "normal")
+        if mode == "suicide":
+            return "(Tự sát)"
+        return "(Bình thường)"
+
+    def _on_mode_change(self, event=None):
+        """Handle play mode change"""
+        mode = self.mode_var.get()
+        self.main_window.config["play_mode"] = mode
+        self.mode_display.config(text=self._get_mode_display_text())
+        self.main_window.log(f"Chế độ chơi: {self._get_mode_display_text()}")
+
+    def _on_auto_new_game_change(self):
+        """Handle auto new game checkbox change"""
+        value = self.auto_new_game_var.get()
+        self.main_window.config["auto_new_game"] = value
+        status = "Bật" if value else "Tắt"
+        self.main_window.log(f"Tự động chơi ván mới: {status}")
+
+    def _on_new_game_delay_change(self, value):
+        """Handle new game delay slider change"""
+        int_value = int(float(value))
+        self.new_game_delay_label.config(text=str(int_value))
+        self.main_window.config["new_game_delay"] = int_value
