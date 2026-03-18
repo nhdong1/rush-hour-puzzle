@@ -21,6 +21,13 @@ PLAY_MODE_NORMAL = "normal"
 PLAY_MODE_SUICIDE = "suicide"
 
 
+class _RookMarker:
+    """Placeholder để đại diện cho rook trong board mô phỏng.
+    Dùng để chặn đường tấn công của quân địch khi tính danger cells."""
+    is_player = True
+    type = 'ROOK'
+
+
 class AIPlayer:
     def __init__(self, depth: int = MAX_DEPTH, play_mode: str = PLAY_MODE_NORMAL):
         self.last_position = None
@@ -420,8 +427,9 @@ class AIPlayer:
         if is_capture:
             captured_piece = new_board[to_pos[0]][to_pos[1]]
 
-        # Di chuyển rook (rook không có trong board_state vì nó được track riêng)
-        new_board[to_pos[0]][to_pos[1]] = None  # Clear target (nếu có quân bị ăn)
+        # Đặt marker cho rook tại vị trí đích để chặn đường tấn công của quân địch
+        # Điều này đảm bảo get_danger_cells tính toán chính xác sau khi rook di chuyển
+        new_board[to_pos[0]][to_pos[1]] = _RookMarker()
 
         return new_board, captured_piece
 
