@@ -144,6 +144,43 @@ class AIPlayer:
     def _is_valid_pos(self, row: int, col: int) -> bool:
         return 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE
 
+    def is_valid_rook_move(self, rook_pos: Tuple[int, int], target_pos: Tuple[int, int], board_state: List[List]) -> bool:
+        """Kiểm tra nước đi có hợp lệ cho quân xe không (chỉ ngang/dọc, không bị chặn)."""
+        if rook_pos is None or target_pos is None:
+            return False
+
+        from_row, from_col = rook_pos
+        to_row, to_col = target_pos
+
+        # Xe chỉ đi ngang hoặc dọc (không phải đường chéo)
+        if from_row != to_row and from_col != to_col:
+            return False
+
+        # Không đứng yên
+        if from_row == to_row and from_col == to_col:
+            return False
+
+        # Xác định hướng di chuyển
+        if from_row == to_row:
+            # Di chuyển ngang
+            step = 1 if to_col > from_col else -1
+            for c in range(from_col + step, to_col, step):
+                if board_state[from_row][c] is not None:
+                    return False  # Bị chặn
+        else:
+            # Di chuyển dọc
+            step = 1 if to_row > from_row else -1
+            for r in range(from_row + step, to_row, step):
+                if board_state[r][from_col] is not None:
+                    return False  # Bị chặn
+
+        # Kiểm tra ô đích - không thể chiếm ô có quân mình
+        target_piece = board_state[to_row][to_col]
+        if target_piece is not None and target_piece.is_player:
+            return False
+
+        return True
+
     def select_best_move(self, valid_moves: List[Tuple[int, int, bool]],
                          board_state: List[List],
                          danger_cells: Set[Tuple[int, int]],
@@ -158,11 +195,21 @@ class AIPlayer:
         if rook_pos is None:
             return valid_moves[0]
 
+        # Lọc lại các nước đi hợp lệ (phòng trường hợp valid_moves có nước sai)
+        verified_moves = []
+        for move in valid_moves:
+            target_row, target_col, is_capture = move
+            if self.is_valid_rook_move(rook_pos, (target_row, target_col), board_state):
+                verified_moves.append(move)
+
+        if not verified_moves:
+            return None
+
         # Phân loại nước đi: an toàn vs tự sát
         safe_moves = []
         suicide_moves = []
 
-        for move in valid_moves:
+        for move in verified_moves:
             target_row, target_col, is_capture = move
 
             # Mô phỏng nước đi
@@ -219,6 +266,13 @@ class AIPlayer:
                 best_move = move
 
             alpha = max(alpha, score)
+
+        # Kiểm tra lần cuối: đảm bảo nước đi được chọn là hợp lệ
+        if best_move is not None:
+            target_row, target_col, _ = best_move
+            if not self.is_valid_rook_move(rook_pos, (target_row, target_col), board_state):
+                # Fallback: chọn nước đi đầu tiên trong danh sách đã xác minh
+                best_move = verified_moves[0] if verified_moves else None
 
         return best_move
 

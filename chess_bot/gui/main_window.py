@@ -172,6 +172,16 @@ class MainWindow:
 
                 board_state, rook_pos = piece_detector.detect_pieces(screenshot, cells)
 
+                # Check if we're on a waiting screen before processing rook
+                if self._is_waiting_for_game(capture, button_detector):
+                    self._safe_log("Đang ở màn hình chờ - bỏ qua detect quân cờ")
+                    auto_new_game = self.config.get("auto_new_game", False)
+                    new_game_delay = self.config.get("new_game_delay", 1000) / 1000.0
+                    if auto_new_game:
+                        self._handle_waiting_screen(capture, button_detector, mouse, new_game_delay)
+                    time.sleep(1)
+                    continue
+
                 if rook_pos is None:
                     no_rook_count += 1
 
@@ -254,6 +264,12 @@ class MainWindow:
         """
         Handle game over by detecting and clicking buttons for new game.
 
+        Flow:
+        1. game_over_popup appears with end_game_button
+        2. Click end_game_button -> enter_game_button appears
+        3. Click enter_game_button -> start_play_button appears
+        4. Click start_play_button -> new game starts
+
         Args:
             capture: ScreenCapture instance
             button_detector: ButtonDetector instance
@@ -261,58 +277,190 @@ class MainWindow:
             delay: Delay between clicks in seconds
 
         Returns:
-            True if any button was clicked, False otherwise
+            True if game over was handled, False otherwise
         """
         region = self.config["game_region"]
-        clicked_any = False
 
-        # Button click sequence
-        button_sequence = [
-            "game_over_popup",  # First check if popup exists
-            "end_game_button",
-            "enter_game_button",
-            "start_play_button",
-        ]
+        # Step 1: Check if game_over_popup is visible
+        screenshot = capture.capture()
+        if screenshot is None:
+            return False
 
-        for button_name in button_sequence:
+        popup_result = button_detector.detect_button(screenshot, "game_over_popup")
+        if popup_result is None:
+            return False  # No game over popup, nothing to handle
+
+        self._safe_log("Phát hiện game_over_popup - bắt đầu xử lý kết thúc game")
+
+        # Step 2: Click end_game_button (appears with popup)
+        if not self._click_button_with_retry(capture, button_detector, mouse, "end_game_button", region, delay):
+            self._safe_log("Không tìm thấy end_game_button")
+            return False
+
+        # Step 3: Click enter_game_button (appears after end_game_button)
+        if not self._click_button_with_retry(capture, button_detector, mouse, "enter_game_button", region, delay):
+            self._safe_log("Không tìm thấy enter_game_button")
+            return True  # Already clicked end_game_button
+
+        # Step 4: Click start_play_button (appears after enter_game_button)
+        if not self._click_button_with_retry(capture, button_detector, mouse, "start_play_button", region, delay):
+            self._safe_log("Không tìm thấy start_play_button")
+            return True  # Already clicked previous buttons
+
+        self._safe_log("Tự động chơi mới - đã hoàn thành, đang chờ game mới bắt đầu...")
+        time.sleep(delay * 2)  # Extra wait for game to load
+
+        return True
+
+    def _click_button_with_retry(self, capture, button_detector, mouse, button_name, region, delay, max_retries=5):
+        """
+        Detect and click a specific button with retry logic.
+
+        Args:
+            capture: ScreenCapture instance
+            button_detector: ButtonDetector instance
+            mouse: MouseController instance
+            button_name: Name of the button to detect
+            region: Game region coordinates
+            delay: Delay between retries in seconds
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            True if button was clicked, False otherwise
+        """
+        for attempt in range(max_retries):
             if not self.bot_running:
-                return clicked_any
+                return False
 
-            # Take fresh screenshot for each button
             screenshot = capture.capture()
             if screenshot is None:
+                time.sleep(delay)
                 continue
 
-            # Detect button
             result = button_detector.detect_button(screenshot, button_name)
-
             if result is not None:
                 x, y, confidence = result
-
-                # Convert to absolute coordinates
                 abs_x = region[0] + x
                 abs_y = region[1] + y
 
                 self._safe_log(f"Phát hiện {button_name} (conf: {confidence:.2f}) - đang nhấp")
-
-                # Click the button
                 mouse.click(abs_x, abs_y)
-                clicked_any = True
-
-                # Wait for UI to respond
                 time.sleep(delay)
+                return True
 
-        if clicked_any:
-            self._safe_log("Tự động chơi mới - đã nhấp nút, đang chờ game mới bắt đầu...")
-            time.sleep(delay * 2)  # Extra wait for game to load
+            # Wait before next retry
+            time.sleep(delay)
 
-        return clicked_any
+        return False
+
+    def _is_waiting_for_game(self, capture, button_detector):
+        """
+        Check if we're on a waiting screen (start_play_button or enter_game_button visible).
+        This prevents false rook detection on non-game screens.
+
+        Returns:
+            True if on a waiting screen, False otherwise
+        """
+        screenshot = capture.capture()
+        if screenshot is None:
+            return False
+
+        # Check for buttons that indicate we're not in an active game
+        waiting_buttons = ["start_play_button", "enter_game_button", "game_over_popup"]
+        for button_name in waiting_buttons:
+            result = button_detector.detect_button(screenshot, button_name)
+            if result is not None:
+                return True
+
+        return False
+
+    def _handle_waiting_screen(self, capture, button_detector, mouse, delay):
+        """
+        Handle waiting screen by clicking appropriate buttons.
+        Called when we detect we're on a waiting screen during normal loop.
+
+        Args:
+            capture: ScreenCapture instance
+            button_detector: ButtonDetector instance
+            mouse: MouseController instance
+            delay: Delay between clicks in seconds
+        """
+        region = self.config["game_region"]
+
+        # Try to click buttons in order of priority
+        buttons_to_try = ["start_play_button", "enter_game_button", "end_game_button"]
+
+        for button_name in buttons_to_try:
+            if not self.bot_running:
+                return
+
+            screenshot = capture.capture()
+            if screenshot is None:
+                continue
+
+            result = button_detector.detect_button(screenshot, button_name)
+            if result is not None:
+                x, y, confidence = result
+                abs_x = region[0] + x
+                abs_y = region[1] + y
+
+                self._safe_log(f"Màn hình chờ: Phát hiện {button_name} (conf: {confidence:.2f}) - đang nhấp")
+                mouse.click(abs_x, abs_y)
+                time.sleep(delay)
+                return  # Only click one button per call
+
+    def _click_button(self, capture, button_detector, mouse, button_name, region, delay):
+        """
+        Detect and click a specific button (single attempt).
+
+        Args:
+            capture: ScreenCapture instance
+            button_detector: ButtonDetector instance
+            mouse: MouseController instance
+            button_name: Name of the button to detect
+            region: Game region coordinates
+            delay: Delay after click
+
+        Returns:
+            True if button was clicked, False otherwise
+        """
+        if not self.bot_running:
+            return False
+
+        screenshot = capture.capture()
+        if screenshot is None:
+            return False
+
+        result = button_detector.detect_button(screenshot, button_name)
+        if result is None:
+            return False
+
+        x, y, confidence = result
+        abs_x = region[0] + x
+        abs_y = region[1] + y
+
+        self._safe_log(f"Phát hiện {button_name} (conf: {confidence:.2f}) - đang nhấp")
+        mouse.click(abs_x, abs_y)
+        time.sleep(delay)
+
+        return True
 
     def _safe_log(self, message):
         try:
-            self.root.after(0, lambda m=message: self.log(m))
+            if self.root.winfo_exists():
+                self.root.after_idle(lambda m=message: self._do_log(m))
         except Exception:
-            print(f"[LOG] {message}")
+            pass
+        # Always print to console for debugging
+        print(f"[LOG] {message}")
+
+    def _do_log(self, message):
+        """Actually perform the log - must be called from main thread"""
+        try:
+            if self.root.winfo_exists():
+                self.log(message)
+        except Exception:
+            pass
 
     def run(self):
         self.root.mainloop()

@@ -124,7 +124,7 @@ class ControlTab:
         self.new_game_delay_var = tk.IntVar(value=self.main_window.config.get("new_game_delay", 1000))
         self.new_game_delay_scale = ttk.Scale(
             delay_frame,
-            from_=500,
+            from_=100,
             to=5000,
             variable=self.new_game_delay_var,
             orient=tk.HORIZONTAL,
