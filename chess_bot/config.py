@@ -27,8 +27,10 @@ default_config = {
     "templates_path": "templates/",
     # New settings
     "play_mode": PLAY_MODE_NORMAL,  # "normal" or "suicide"
-    "auto_new_game": False,
-    "new_game_delay": 1000,  # ms
+    # Auto-click conditions system
+    # Each condition: {"name": str, "template_name": str, "enabled": bool, "cooldown_ms": int,
+    #                  "click_sequence": [{"x": int, "y": int, "delay_ms": int}]}
+    "auto_click_conditions": [],
 }
 
 

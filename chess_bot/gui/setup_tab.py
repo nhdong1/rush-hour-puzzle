@@ -129,6 +129,65 @@ class SetupTab:
         self.template_count_label = ttk.Label(template_action_frame, text="", foreground="gray")
         self.template_count_label.pack(side=tk.RIGHT)
 
+        # ============ Auto-Click Conditions Section ============
+        conditions_frame = ttk.LabelFrame(left_frame, text="Điều kiện Auto Click", padding="10")
+        conditions_frame.pack(fill=tk.X, pady=(0, 10))
+
+        conditions_btn_frame = ttk.Frame(conditions_frame)
+        conditions_btn_frame.pack(fill=tk.X, pady=(0, 5))
+
+        self.add_condition_btn = ttk.Button(
+            conditions_btn_frame,
+            text="➕ Thêm điều kiện",
+            command=self._add_condition
+        )
+        self.add_condition_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.edit_condition_btn = ttk.Button(
+            conditions_btn_frame,
+            text="✏️ Sửa",
+            command=self._edit_condition,
+            width=8
+        )
+        self.edit_condition_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.delete_condition_btn = ttk.Button(
+            conditions_btn_frame,
+            text="🗑️ Xóa",
+            command=self._delete_condition,
+            width=8
+        )
+        self.delete_condition_btn.pack(side=tk.LEFT)
+
+        # Conditions listbox
+        self.conditions_listbox = tk.Listbox(conditions_frame, height=5, width=35, font=("Consolas", 9))
+        self.conditions_listbox.pack(fill=tk.X, pady=(5, 5))
+
+        conditions_info_frame = ttk.Frame(conditions_frame)
+        conditions_info_frame.pack(fill=tk.X)
+
+        self.conditions_count_label = ttk.Label(conditions_info_frame, text="0 điều kiện", foreground="gray")
+        self.conditions_count_label.pack(side=tk.LEFT)
+
+        # Toggle enable/disable button
+        self.toggle_condition_btn = ttk.Button(
+            conditions_info_frame,
+            text="🔄 Bật/Tắt",
+            command=self._toggle_condition,
+            width=10
+        )
+        self.toggle_condition_btn.pack(side=tk.RIGHT)
+
+        # Virtual click mode checkbox
+        self.virtual_mode_var = tk.BooleanVar(value=True)
+        self.virtual_mode_checkbox = ttk.Checkbutton(
+            conditions_frame,
+            text="Bật/tắt chế độ không chiếm chuột",
+            variable=self.virtual_mode_var,
+            command=self._on_virtual_mode_changed
+        )
+        self.virtual_mode_checkbox.pack(anchor=tk.W, pady=(5, 0))
+
         save_frame = ttk.Frame(left_frame)
         save_frame.pack(fill=tk.X, pady=(10, 0))
 
@@ -169,6 +228,18 @@ class SetupTab:
         # Load template list
         self._refresh_template_list()
 
+        # Load conditions list
+        self._refresh_conditions_list()
+
+        # Load virtual mode setting
+        virtual_mode = config.get("virtual_click_mode", True)
+        self.virtual_mode_var.set(virtual_mode)
+
+    def _on_virtual_mode_changed(self):
+        """Callback khi thay đổi chế độ click ảo"""
+        self.main_window.config["virtual_click_mode"] = self.virtual_mode_var.get()
+        mode_text = "bật" if self.virtual_mode_var.get() else "tắt"
+        self.main_window.log(f"Chế độ không chiếm chuột: {mode_text}")
 
     def _select_region(self):
         self.main_window.root.iconify()
@@ -330,3 +401,113 @@ class SetupTab:
                 break
 
         self._refresh_template_list()
+
+    # ============ Condition Management Methods ============
+
+    def _refresh_conditions_list(self):
+        """Refresh the conditions listbox from config"""
+        self.conditions_listbox.delete(0, tk.END)
+
+        conditions = self.main_window.config.get("auto_click_conditions", [])
+
+        for cond in conditions:
+            name = cond.get("name", "Unknown")
+            template = cond.get("template_name", "")
+            enabled = cond.get("enabled", True)
+            clicks = len(cond.get("click_sequence", []))
+
+            status = "✓" if enabled else "✗"
+            display = f"{status} {name} [{template}] - {clicks} clicks"
+            self.conditions_listbox.insert(tk.END, display)
+
+        self.conditions_count_label.config(text=f"{len(conditions)} điều kiện")
+
+    def _add_condition(self):
+        """Open dialog to add new condition"""
+        from .condition_editor import ConditionEditorDialog
+
+        ConditionEditorDialog(
+            self.main_window.root,
+            callback=self._on_condition_added
+        )
+
+    def _on_condition_added(self, condition):
+        """Callback when a new condition is added"""
+        if "auto_click_conditions" not in self.main_window.config:
+            self.main_window.config["auto_click_conditions"] = []
+
+        self.main_window.config["auto_click_conditions"].append(condition)
+        self._refresh_conditions_list()
+        self.main_window.log(f"Đã thêm điều kiện: {condition['name']}")
+
+    def _edit_condition(self):
+        """Edit selected condition"""
+        selection = self.conditions_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn điều kiện để sửa")
+            return
+
+        idx = selection[0]
+        conditions = self.main_window.config.get("auto_click_conditions", [])
+
+        if idx >= len(conditions):
+            return
+
+        condition = conditions[idx]
+
+        from .condition_editor import ConditionEditorDialog
+
+        ConditionEditorDialog(
+            self.main_window.root,
+            condition=condition.copy(),
+            callback=lambda c: self._on_condition_edited(idx, c)
+        )
+
+    def _on_condition_edited(self, idx, condition):
+        """Callback when a condition is edited"""
+        conditions = self.main_window.config.get("auto_click_conditions", [])
+
+        if idx < len(conditions):
+            conditions[idx] = condition
+            self._refresh_conditions_list()
+            self.main_window.log(f"Đã cập nhật điều kiện: {condition['name']}")
+
+    def _delete_condition(self):
+        """Delete selected condition"""
+        selection = self.conditions_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn điều kiện để xóa")
+            return
+
+        idx = selection[0]
+        conditions = self.main_window.config.get("auto_click_conditions", [])
+
+        if idx >= len(conditions):
+            return
+
+        cond_name = conditions[idx].get("name", "Unknown")
+
+        if not messagebox.askyesno("Xác nhận xóa", f"Xóa điều kiện '{cond_name}'?"):
+            return
+
+        del conditions[idx]
+        self._refresh_conditions_list()
+        self.main_window.log(f"Đã xóa điều kiện: {cond_name}")
+
+    def _toggle_condition(self):
+        """Toggle enable/disable for selected condition"""
+        selection = self.conditions_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn điều kiện để bật/tắt")
+            return
+
+        idx = selection[0]
+        conditions = self.main_window.config.get("auto_click_conditions", [])
+
+        if idx >= len(conditions):
+            return
+
+        conditions[idx]["enabled"] = not conditions[idx].get("enabled", True)
+        status = "bật" if conditions[idx]["enabled"] else "tắt"
+        self._refresh_conditions_list()
+        self.main_window.log(f"Điều kiện '{conditions[idx]['name']}' đã {status}")

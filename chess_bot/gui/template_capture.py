@@ -17,14 +17,7 @@ PIECE_TEMPLATES = [
     "king_black",
 ]
 
-BUTTON_TEMPLATES = [
-    "game_over_popup",
-    "end_game_button",
-    "enter_game_button",
-    "start_play_button",
-]
-
-ALL_TEMPLATES = PIECE_TEMPLATES + BUTTON_TEMPLATES
+ALL_TEMPLATES = PIECE_TEMPLATES
 
 
 class TemplateCaptureDialog:

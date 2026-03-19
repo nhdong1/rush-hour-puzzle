@@ -8,15 +8,8 @@ class ButtonDetector:
     """
     Detector for UI buttons and popups using template matching.
     Supports multi-resolution matching by scaling templates.
+    Dynamically loads all templates from templates folder.
     """
-
-    # Button template names (hard-coded)
-    BUTTON_TEMPLATES = [
-        "game_over_popup",    # Popup hiển thị khi game over
-        "end_game_button",    # Nút kết thúc/đóng popup
-        "enter_game_button",  # Nút vào trò chơi
-        "start_play_button",  # Nút bắt đầu chơi
-    ]
 
     # Scale factors for multi-resolution matching
     SCALE_FACTORS = [0.8, 0.9, 1.0, 1.1, 1.2]
@@ -28,7 +21,7 @@ class ButtonDetector:
         self._load_templates()
 
     def _load_templates(self):
-        """Load button templates from templates folder"""
+        """Load all templates from templates folder (dynamic)"""
         if not os.path.exists(self.templates_path):
             os.makedirs(self.templates_path, exist_ok=True)
             return
@@ -36,12 +29,10 @@ class ButtonDetector:
         for filename in os.listdir(self.templates_path):
             if filename.endswith(('.png', '.jpg', '.jpeg')):
                 name = os.path.splitext(filename)[0]
-                # Only load button templates
-                if name in self.BUTTON_TEMPLATES:
-                    filepath = os.path.join(self.templates_path, filename)
-                    template = cv2.imread(filepath)
-                    if template is not None:
-                        self.templates[name] = template
+                filepath = os.path.join(self.templates_path, filename)
+                template = cv2.imread(filepath)
+                if template is not None:
+                    self.templates[name] = template
 
     def reload_templates(self):
         """Reload templates from disk"""
@@ -53,12 +44,12 @@ class ButtonDetector:
         self.threshold = threshold
 
     def get_available_templates(self) -> List[str]:
-        """Get list of available (loaded) button templates"""
+        """Get list of all available (loaded) templates"""
         return list(self.templates.keys())
 
-    def get_missing_templates(self) -> List[str]:
-        """Get list of button templates that are not yet captured"""
-        return [name for name in self.BUTTON_TEMPLATES if name not in self.templates]
+    def has_template(self, template_name: str) -> bool:
+        """Check if a template is loaded"""
+        return template_name in self.templates
 
     def detect_buttons(self, screenshot: np.ndarray) -> Dict[str, Tuple[int, int, float]]:
         """
@@ -162,48 +153,3 @@ class ButtonDetector:
             return scaled
         except Exception:
             return None
-
-    def is_game_over_detected(self, screenshot: np.ndarray) -> bool:
-        """
-        Check if game over popup is detected.
-
-        Args:
-            screenshot: BGR image from screen capture
-
-        Returns:
-            True if game_over_popup template is found
-        """
-        if "game_over_popup" not in self.templates:
-            return False
-
-        result = self.detect_button(screenshot, "game_over_popup")
-        return result is not None
-
-    def get_click_sequence(self, screenshot: np.ndarray) -> List[Tuple[str, int, int]]:
-        """
-        Get sequence of buttons to click for new game.
-        Returns buttons in priority order that are currently visible.
-
-        Args:
-            screenshot: BGR image
-
-        Returns:
-            List of (button_name, x, y) tuples for buttons that should be clicked
-        """
-        click_sequence = []
-
-        # Priority order for clicking
-        button_priority = [
-            "end_game_button",
-            "enter_game_button",
-            "start_play_button",
-        ]
-
-        detected = self.detect_buttons(screenshot)
-
-        for button_name in button_priority:
-            if button_name in detected:
-                x, y, _ = detected[button_name]
-                click_sequence.append((button_name, x, y))
-
-        return click_sequence

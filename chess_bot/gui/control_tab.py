@@ -102,39 +102,6 @@ class ControlTab:
         self.speed_label = ttk.Label(speed_frame, text="500", width=5)
         self.speed_label.pack(side=tk.LEFT)
 
-        # Auto New Game settings
-        auto_frame = ttk.Frame(settings_frame)
-        auto_frame.pack(fill=tk.X, pady=(0, 10))
-
-        self.auto_new_game_var = tk.BooleanVar(value=self.main_window.config.get("auto_new_game", False))
-        self.auto_new_game_check = ttk.Checkbutton(
-            auto_frame,
-            text="Tự động chơi ván mới",
-            variable=self.auto_new_game_var,
-            command=self._on_auto_new_game_change
-        )
-        self.auto_new_game_check.pack(side=tk.LEFT)
-
-        # New game delay slider
-        delay_frame = ttk.Frame(settings_frame)
-        delay_frame.pack(fill=tk.X, pady=(0, 5))
-
-        ttk.Label(delay_frame, text="Delay ván mới (ms):").pack(side=tk.LEFT)
-
-        self.new_game_delay_var = tk.IntVar(value=self.main_window.config.get("new_game_delay", 1000))
-        self.new_game_delay_scale = ttk.Scale(
-            delay_frame,
-            from_=100,
-            to=5000,
-            variable=self.new_game_delay_var,
-            orient=tk.HORIZONTAL,
-            command=self._on_new_game_delay_change
-        )
-        self.new_game_delay_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10)
-
-        self.new_game_delay_label = ttk.Label(delay_frame, text="1000", width=5)
-        self.new_game_delay_label.pack(side=tk.LEFT)
-
         status_frame = ttk.LabelFrame(self.frame, text="Thống kê", padding="15")
         status_frame.pack(fill=tk.X, pady=(0, 10))
 
@@ -269,16 +236,3 @@ class ControlTab:
         self.main_window.config["play_mode"] = mode
         self.mode_display.config(text=self._get_mode_display_text())
         self.main_window.log(f"Chế độ chơi: {self._get_mode_display_text()}")
-
-    def _on_auto_new_game_change(self):
-        """Handle auto new game checkbox change"""
-        value = self.auto_new_game_var.get()
-        self.main_window.config["auto_new_game"] = value
-        status = "Bật" if value else "Tắt"
-        self.main_window.log(f"Tự động chơi ván mới: {status}")
-
-    def _on_new_game_delay_change(self, value):
-        """Handle new game delay slider change"""
-        int_value = int(float(value))
-        self.new_game_delay_label.config(text=str(int_value))
-        self.main_window.config["new_game_delay"] = int_value
