@@ -19,6 +19,7 @@ default_config = {
     "cell_color": None,
     "unflipped_color": None,
     "color_tolerance": 30,
+    "cell_gap": None,
     "move_delay": 500,
     "templates_path": "templates/",
     "auto_click_conditions": [],

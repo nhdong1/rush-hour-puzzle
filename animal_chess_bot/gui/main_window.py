@@ -135,7 +135,8 @@ class MainWindow:
         
         board_detector = BoardDetector(
             self.config.get("cell_color"),
-            self.config.get("color_tolerance", 30)
+            self.config.get("color_tolerance", 30),
+            self.config.get("cell_gap")
         )
 
         templates_path = get_templates_path()

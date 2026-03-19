@@ -12,9 +12,10 @@ class BoardDetector:
     Unlike regular chess board, cells are not contiguous.
     """
     
-    def __init__(self, cell_color=None, tolerance=30):
+    def __init__(self, cell_color=None, tolerance=30, manual_gap=None):
         self.cell_color = np.array(cell_color) if cell_color else None
         self.tolerance = tolerance
+        self.manual_gap = manual_gap
         
         self.cell_size = None
         self.gap_size = None
@@ -26,6 +27,10 @@ class BoardDetector:
         
     def set_tolerance(self, tolerance):
         self.tolerance = tolerance
+        
+    def set_manual_gap(self, gap):
+        """Set manual gap size (in pixels). Set to None to use auto detection."""
+        self.manual_gap = gap
         
     def detect_cells(self, screenshot) -> Optional[List[List[dict]]]:
         """
@@ -128,16 +133,22 @@ class BoardDetector:
         """
         Fallback: assume uniform grid with gaps.
         Estimate cell size and gap based on image dimensions.
+        If manual_gap is set, use that value instead of estimating.
         """
         total_cells = BOARD_SIZE
-        estimated_gap_ratio = 0.1
         
         total_width = width
         total_height = height
         
-        cell_plus_gap = min(total_width, total_height) / total_cells
-        self.gap_size = int(cell_plus_gap * estimated_gap_ratio)
-        self.cell_size = int(cell_plus_gap - self.gap_size)
+        if self.manual_gap is not None:
+            self.gap_size = self.manual_gap
+            total_gap_width = self.gap_size * (BOARD_SIZE - 1)
+            self.cell_size = int((min(total_width, total_height) - total_gap_width) / total_cells)
+        else:
+            estimated_gap_ratio = 0.1
+            cell_plus_gap = min(total_width, total_height) / total_cells
+            self.gap_size = int(cell_plus_gap * estimated_gap_ratio)
+            self.cell_size = int(cell_plus_gap - self.gap_size)
         
         total_board_width = self.cell_size * BOARD_SIZE + self.gap_size * (BOARD_SIZE - 1)
         total_board_height = self.cell_size * BOARD_SIZE + self.gap_size * (BOARD_SIZE - 1)

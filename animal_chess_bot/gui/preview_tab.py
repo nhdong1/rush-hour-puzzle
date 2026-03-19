@@ -98,7 +98,8 @@ class PreviewTab:
             
             board_detector = BoardDetector(
                 self.main_window.config.get("cell_color"),
-                self.main_window.config.get("color_tolerance", 30)
+                self.main_window.config.get("color_tolerance", 30),
+                self.main_window.config.get("cell_gap")
             )
             
             templates_path = get_templates_path()

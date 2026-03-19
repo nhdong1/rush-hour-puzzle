@@ -75,6 +75,40 @@ class SetupTab:
         self.tolerance_label = ttk.Label(tolerance_frame, text="30")
         self.tolerance_label.pack(side=tk.LEFT)
 
+        gap_frame = ttk.LabelFrame(left_frame, text="Chỉnh khoảng cách giữa các ô", padding="10")
+        gap_frame.pack(fill=tk.X, pady=(0, 10))
+
+        gap_control_frame = ttk.Frame(gap_frame)
+        gap_control_frame.pack(fill=tk.X)
+
+        self.gap_auto_var = tk.BooleanVar(value=self.main_window.config.get("cell_gap") is None)
+        self.gap_auto_checkbox = ttk.Checkbutton(
+            gap_control_frame,
+            text="Tự động",
+            variable=self.gap_auto_var,
+            command=self._on_gap_auto_changed
+        )
+        self.gap_auto_checkbox.pack(side=tk.LEFT)
+
+        ttk.Label(gap_control_frame, text="Gap (px):").pack(side=tk.LEFT, padx=(10, 5))
+
+        current_gap = self.main_window.config.get("cell_gap")
+        self.gap_var = tk.IntVar(value=current_gap if current_gap is not None else 10)
+        self.gap_spinbox = ttk.Spinbox(
+            gap_control_frame,
+            from_=0,
+            to=100,
+            width=6,
+            textvariable=self.gap_var,
+            command=self._on_gap_change
+        )
+        self.gap_spinbox.pack(side=tk.LEFT)
+        self.gap_spinbox.bind('<Return>', lambda e: self._on_gap_change())
+        self.gap_spinbox.bind('<FocusOut>', lambda e: self._on_gap_change())
+
+        if self.gap_auto_var.get():
+            self.gap_spinbox.config(state='disabled')
+
         template_frame = ttk.LabelFrame(left_frame, text="Quản lý Template", padding="10")
         template_frame.pack(fill=tk.X, pady=(0, 10))
 
@@ -198,6 +232,15 @@ class SetupTab:
             hex_color = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
             self.cell_color_preview.config(bg=hex_color)
 
+        cell_gap = config.get("cell_gap")
+        if cell_gap is not None:
+            self.gap_auto_var.set(False)
+            self.gap_var.set(cell_gap)
+            self.gap_spinbox.config(state='normal')
+        else:
+            self.gap_auto_var.set(True)
+            self.gap_spinbox.config(state='disabled')
+
         self._refresh_template_list()
         self._refresh_conditions_list()
 
@@ -257,6 +300,26 @@ class SetupTab:
         int_value = int(float(value))
         self.tolerance_label.config(text=str(int_value))
         self.main_window.config["color_tolerance"] = int_value
+
+    def _on_gap_auto_changed(self):
+        if self.gap_auto_var.get():
+            self.gap_spinbox.config(state='disabled')
+            self.main_window.config["cell_gap"] = None
+            self.main_window.log("Khoảng cách ô: Tự động")
+        else:
+            self.gap_spinbox.config(state='normal')
+            gap_value = self.gap_var.get()
+            self.main_window.config["cell_gap"] = gap_value
+            self.main_window.log(f"Khoảng cách ô: {gap_value}px")
+
+    def _on_gap_change(self):
+        if not self.gap_auto_var.get():
+            try:
+                gap_value = self.gap_var.get()
+                self.main_window.config["cell_gap"] = gap_value
+                self.main_window.log(f"Khoảng cách ô: {gap_value}px")
+            except tk.TclError:
+                pass
 
     def _update_preview(self):
         region = self.main_window.config.get("game_region")
