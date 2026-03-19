@@ -405,6 +405,28 @@ function findMaximalExpressionSet(allExpressions, availableNums, availableOps) {
     let bestSet = [];
     let iterations = 0;
 
+    // Score each expression: prefer using numbers/operators with higher supply
+    // This helps balance resource usage and avoid "bottleneck" situations
+    function scoreExpression(expr, nums, ops) {
+        let score = 0;
+        // Higher score for using numbers that have more supply
+        for (const n of expr.numbers) {
+            score += nums[n] || 0;
+        }
+        // Higher score for using operators that have more supply
+        for (const o of expr.operators) {
+            score += ops[o] || 0;
+        }
+        return score;
+    }
+
+    // Sort expressions by score (descending) - prioritize using abundant resources
+    const sortedExpressions = [...allExpressions].sort((a, b) => {
+        const scoreA = scoreExpression(a, availableNums, availableOps);
+        const scoreB = scoreExpression(b, availableNums, availableOps);
+        return scoreB - scoreA;
+    });
+
     function canUseExpression(expr, nums, ops) {
         // Check if we have enough resources for this expression
         const tempNums = { ...nums };
@@ -437,15 +459,15 @@ function findMaximalExpressionSet(allExpressions, availableNums, availableOps) {
         }
 
         // Pruning: if remaining expressions can't beat the best, stop
-        const remainingExpressions = allExpressions.length - index;
+        const remainingExpressions = sortedExpressions.length - index;
         if (currentSet.length + remainingExpressions <= bestSet.length) {
             return;
         }
 
-        for (let i = index; i < allExpressions.length; i++) {
+        for (let i = index; i < sortedExpressions.length; i++) {
             if (iterations >= SOLVER_CONFIG.maxBacktrackIterations) return;
 
-            const expr = allExpressions[i];
+            const expr = sortedExpressions[i];
             const result = canUseExpression(expr, nums, ops);
 
             if (result) {
