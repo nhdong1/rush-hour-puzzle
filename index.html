@@ -40,6 +40,9 @@
     <!-- Theme Color -->
     <meta name="theme-color" content="#007bff" />
 
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <!-- Stylesheet -->
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -297,61 +300,47 @@
 
         <!-- Options Section -->
         <div class="math-section">
-          <h3>⚙️ Tùy chọn hiển thị</h3>
-          <div style="display: flex; gap: 20px; flex-wrap: wrap">
-            <label
-              style="
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                cursor: pointer;
-              "
-            >
-              <input type="checkbox" id="chk-show-suggest" />
-              <span>Hiển thị dự đoán</span>
-            </label>
-            <label
-              style="
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                cursor: pointer;
-              "
-            >
-              <input type="checkbox" id="chk-show-remaining" />
-              <span>Hiển thị số lượng còn lại</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Suggest Section -->
-        <div class="math-section" id="suggest-section" style="display: none">
-          <h3>💡 Gợi ý thêm số/phép tính</h3>
+          <h3>⚙️ Tùy chọn</h3>
           <div
             style="
               display: flex;
-              align-items: center;
-              gap: 15px;
+              gap: 20px;
               flex-wrap: wrap;
+              align-items: center;
             "
           >
-            <div class="req-item" style="flex: 0 0 auto">
-              <label>Số lượng có thể thêm (số hoặc phép tính):</label>
-              <input
-                type="number"
-                id="suggest-extra-total"
-                value="1"
-                min="1"
-                max="10"
-                style="width: 80px"
-              />
-            </div>
-            <button id="btnMathSuggest" class="btn-info">Gợi Ý</button>
+            <label class="checkbox-label">
+              <input type="checkbox" id="chk-show-remaining" />
+              <span>Hiển thị số lượng còn lại</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="chk-show-analytics" />
+              <span>Hiển thị phân tích</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="chk-auto-record" />
+              <span>Tự động ghi nhận</span>
+            </label>
           </div>
-          <div
-            id="suggest-result"
-            style="display: none; margin-top: 15px"
-          ></div>
+          <div class="save-load-buttons" style="margin-top: 15px">
+            <button id="btnMathSave" class="btn-secondary">💾 Lưu</button>
+            <button id="btnMathLoad" class="btn-secondary">📂 Tải</button>
+          </div>
+        </div>
+
+        <!-- Analytics Section -->
+        <div class="math-section" id="analytics-section" style="display: none">
+          <h3>📊 Lịch sử & Phân tích</h3>
+          <div class="analytics-controls">
+            <button id="btnAnalytics" class="btn-info">🔄 Cập nhật</button>
+            <button id="btnClearHistory" class="btn-danger">
+              🗑️ Xóa lịch sử
+            </button>
+          </div>
+          <div id="analytics-chart-container" class="chart-container">
+            <canvas id="analytics-chart"></canvas>
+          </div>
+          <div id="history-list" class="history-list"></div>
         </div>
 
         <!-- Buttons -->

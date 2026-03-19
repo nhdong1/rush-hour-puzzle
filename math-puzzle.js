@@ -14,7 +14,7 @@ let gameState = {
 
 // ==================== UI STATE ====================
 
-let showSuggest = false;
+let showAnalytics = false;
 let showRemaining = false;
 let lastSolveResult = null;
 
@@ -35,16 +35,21 @@ export function initMathPuzzle() {
 }
 
 function setupOptionCheckboxes() {
-    const suggestCheckbox = document.getElementById('chk-show-suggest');
+    const analyticsCheckbox = document.getElementById('chk-show-analytics');
     const remainingCheckbox = document.getElementById('chk-show-remaining');
-    const suggestSection = document.getElementById('suggest-section');
+    const autoRecordCheckbox = document.getElementById('chk-auto-record');
+    const analyticsSection = document.getElementById('analytics-section');
 
-    if (suggestCheckbox) {
-        suggestCheckbox.checked = showSuggest;
-        suggestCheckbox.addEventListener('change', function () {
-            showSuggest = this.checked;
-            if (suggestSection) {
-                suggestSection.style.display = showSuggest ? 'block' : 'none';
+    if (analyticsCheckbox) {
+        analyticsCheckbox.checked = showAnalytics;
+        analyticsCheckbox.addEventListener('change', function () {
+            showAnalytics = this.checked;
+            if (analyticsSection) {
+                analyticsSection.style.display = showAnalytics ? 'block' : 'none';
+                if (showAnalytics) {
+                    renderAnalyticsChart();
+                    renderHistoryList();
+                }
             }
         });
     }
@@ -58,6 +63,12 @@ function setupOptionCheckboxes() {
             if (solutionsContainer && solutionsContainer.style.display !== 'none' && lastSolveResult) {
                 displaySolutions(lastSolveResult);
             }
+        });
+    }
+
+    if (autoRecordCheckbox) {
+        autoRecordCheckbox.addEventListener('change', function () {
+            autoRecord = this.checked;
         });
     }
 }
@@ -521,258 +532,458 @@ function displaySolutions(result) {
     container.appendChild(list);
 }
 
-// ==================== SUGGEST FEATURE ====================
+// ==================== SAVE/LOAD STATE ====================
 
-async function suggestBestAdditions(extraTotal) {
-    // Get current baseline result
-    const baselineResult = await solvePuzzleWithState(gameState.numbers, gameState.operators);
-    const baselineCount = baselineResult.success ? baselineResult.maxCorrect : 0;
+const STORAGE_KEY_STATE = 'math-puzzle-state';
+const STORAGE_KEY_RECORDS = 'math-puzzle-records';
+const MAX_RECORDS = 50;
 
-    if (extraTotal <= 0) {
-        return {
-            baseline: baselineCount,
-            suggestions: [],
-            message: 'Vui lòng nhập số lượng muốn thêm!'
-        };
-    }
-
-    const allNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-    const allOperators = ['+', '-', '*', '/'];
-    const allItems = [...allNumbers.map(n => ({ type: 'num', value: n })),
-    ...allOperators.map(op => ({ type: 'op', value: op }))];
-
-    // Generate all possible combinations of items to add
-    const suggestions = [];
-    const itemCombinations = generateAdditionCombinations(allItems, extraTotal);
-
-    // Limit total combinations to avoid performance issues
-    const maxCombinations = 500;
-    let testedCount = 0;
-
-    for (const combo of itemCombinations) {
-        if (testedCount >= maxCombinations) break;
-        testedCount++;
-
-        // Create modified state
-        const modifiedNums = { ...gameState.numbers };
-        const modifiedOps = { ...gameState.operators };
-        const addedNumbers = [];
-        const addedOperators = [];
-
-        // Add items
-        for (const item of combo) {
-            if (item.type === 'num') {
-                modifiedNums[item.value]++;
-                addedNumbers.push(item.value);
-            } else {
-                modifiedOps[item.value]++;
-                addedOperators.push(item.value);
-            }
-        }
-
-        // Solve with modified state
-        const result = await solvePuzzleWithState(modifiedNums, modifiedOps);
-        const count = result.success ? result.maxCorrect : 0;
-
-        if (count > baselineCount) {
-            suggestions.push({
-                addedNumbers,
-                addedOperators,
-                resultCount: count,
-                improvement: count - baselineCount
-            });
-        }
-    }
-
-    // Sort by improvement (descending)
-    suggestions.sort((a, b) => b.improvement - a.improvement ||
-        (a.addedNumbers.length + a.addedOperators.length) - (b.addedNumbers.length + b.addedOperators.length));
-
-    // Keep top 5 unique suggestions
-    const uniqueSuggestions = [];
-    const seen = new Set();
-    for (const sug of suggestions) {
-        const key = JSON.stringify([sug.addedNumbers.sort(), sug.addedOperators.sort()]);
-        if (!seen.has(key)) {
-            seen.add(key);
-            uniqueSuggestions.push(sug);
-            if (uniqueSuggestions.length >= 5) break;
-        }
-    }
-
-    return {
-        baseline: baselineCount,
-        suggestions: uniqueSuggestions,
-        testedCombinations: testedCount,
-        message: uniqueSuggestions.length > 0
-            ? `Tìm thấy ${uniqueSuggestions.length} gợi ý tốt nhất!`
-            : 'Không tìm thấy cách thêm nào cải thiện kết quả.'
+function saveCurrentState() {
+    const state = {
+        numbers: { ...gameState.numbers },
+        operators: { ...gameState.operators },
+        numDigits: gameState.numDigits,
+        numOperators: gameState.numOperators,
+        targetResult: gameState.targetResult
     };
-}
-
-function generateAdditionCombinations(items, count) {
-    if (count === 0) return [[]];
-
-    const result = [];
-
-    function backtrack(start, current) {
-        if (current.length === count) {
-            result.push([...current]);
-            return;
-        }
-
-        for (let i = start; i < items.length; i++) {
-            current.push(items[i]);
-            backtrack(i, current); // Allow same item multiple times
-            current.pop();
-        }
+    try {
+        localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(state));
+        showFeedback('Đã lưu trạng thái!', 'success');
+    } catch (e) {
+        console.error('Save error:', e);
+        showFeedback('Lỗi khi lưu trạng thái!', 'error');
     }
-
-    backtrack(0, []);
-    return result;
 }
 
-async function solvePuzzleWithState(numbers, operators) {
-    // Build arrays from resources
-    const numsArray = [];
-    const opsArray = [];
+function loadSavedState() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY_STATE);
+        if (!saved) {
+            showFeedback('Chưa có trạng thái đã lưu!', 'error');
+            return false;
+        }
 
+        const state = JSON.parse(saved);
+
+        // Restore gameState
+        gameState.numbers = { ...state.numbers };
+        gameState.operators = { ...state.operators };
+        gameState.numDigits = state.numDigits;
+        gameState.numOperators = state.numOperators;
+        gameState.targetResult = state.targetResult;
+
+        // Update all UI inputs
+        updateAllInputsFromState();
+        updateExpressionSlots();
+
+        showFeedback('Đã tải trạng thái!', 'success');
+        return true;
+    } catch (e) {
+        console.error('Load error:', e);
+        showFeedback('Lỗi khi tải trạng thái!', 'error');
+        return false;
+    }
+}
+
+function updateAllInputsFromState() {
+    // Update number inputs
     for (let i = 0; i <= 9; i++) {
-        for (let j = 0; j < numbers[i]; j++) {
-            numsArray.push(i);
+        const input = document.getElementById(`num-qty-${i}`);
+        if (input) input.value = gameState.numbers[i];
+    }
+
+    // Update operator inputs
+    const ops = ['+', '-', '*', '/'];
+    const opIds = ['plus', 'minus', 'multiply', 'divide'];
+    ops.forEach((op, index) => {
+        const input = document.getElementById(`op-qty-${opIds[index]}`);
+        if (input) input.value = gameState.operators[op];
+    });
+
+    // Update requirement inputs
+    const numDigitsInput = document.getElementById('req-num-digits');
+    const numOpsInput = document.getElementById('req-num-ops');
+    const targetInput = document.getElementById('req-target');
+
+    if (numDigitsInput) numDigitsInput.value = gameState.numDigits;
+    if (numOpsInput) numOpsInput.value = gameState.numOperators;
+    if (targetInput) targetInput.value = gameState.targetResult;
+}
+
+// ==================== RECORD MANAGER ====================
+
+function getRecords() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY_RECORDS);
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        console.error('Get records error:', e);
+        return [];
+    }
+}
+
+function saveRecord(record) {
+    try {
+        const records = getRecords();
+        records.push(record);
+
+        // Keep only last MAX_RECORDS (FIFO)
+        while (records.length > MAX_RECORDS) {
+            records.shift();
+        }
+
+        localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(records));
+        return true;
+    } catch (e) {
+        console.error('Save record error:', e);
+        return false;
+    }
+}
+
+function clearRecords() {
+    try {
+        localStorage.removeItem(STORAGE_KEY_RECORDS);
+        showFeedback('Đã xóa lịch sử!', 'success');
+        return true;
+    } catch (e) {
+        console.error('Clear records error:', e);
+        return false;
+    }
+}
+
+function getBaselineInputs() {
+    // Get the first record's inputs as baseline for current requirements
+    const records = getRecords();
+    const filtered = records.filter(r =>
+        r.inputs.numDigits === gameState.numDigits &&
+        r.inputs.numOperators === gameState.numOperators &&
+        r.inputs.targetResult === gameState.targetResult
+    );
+
+    if (filtered.length === 0) {
+        return null;
+    }
+
+    // Sort by timestamp ascending, get first
+    filtered.sort((a, b) => a.id - b.id);
+    return filtered[0].inputs;
+}
+
+function computeDelta(currentInputs, baselineInputs) {
+    if (!baselineInputs) return null;
+
+    const deltaNumbers = {};
+    const deltaOperators = {};
+
+    // Compute number deltas (compared to baseline/first record)
+    for (let i = 0; i <= 9; i++) {
+        const diff = currentInputs.numbers[i] - baselineInputs.numbers[i];
+        if (diff !== 0) {
+            deltaNumbers[i] = diff;
         }
     }
 
+    // Compute operator deltas (compared to baseline/first record)
     const ops = ['+', '-', '*', '/'];
     ops.forEach(op => {
-        for (let j = 0; j < operators[op]; j++) {
-            opsArray.push(op);
+        const diff = currentInputs.operators[op] - baselineInputs.operators[op];
+        if (diff !== 0) {
+            deltaOperators[op] = diff;
         }
     });
 
-    // Check if we have enough resources
-    if (numsArray.length < gameState.numDigits || opsArray.length < gameState.numOperators) {
-        return { success: false, maxCorrect: 0 };
+    // Return null if no changes from baseline
+    if (Object.keys(deltaNumbers).length === 0 && Object.keys(deltaOperators).length === 0) {
+        return null;
     }
 
-    // Find all valid expressions
-    const validExpressions = [];
-    const seen = new Set();
+    return { deltaNumbers, deltaOperators };
+}
 
-    const numCombinations = getCombinations(numsArray, gameState.numDigits);
-    const opCombinations = getCombinations(opsArray, gameState.numOperators);
+function createRecord(solveResult) {
+    const currentInputs = {
+        numbers: { ...gameState.numbers },
+        operators: { ...gameState.operators },
+        numDigits: gameState.numDigits,
+        numOperators: gameState.numOperators,
+        targetResult: gameState.targetResult
+    };
 
-    outer:
-    for (const numCombo of numCombinations) {
-        const numPerms = getUniquePermutations(numCombo);
+    // Get baseline (first record) to compute delta
+    const baselineInputs = getBaselineInputs();
+    const delta = computeDelta(currentInputs, baselineInputs);
 
-        for (const nums of numPerms) {
-            for (const opCombo of opCombinations) {
-                const opPerms = getUniquePermutations(opCombo);
+    // Get final remaining from last solution
+    let finalRemaining = null;
+    if (solveResult.success && solveResult.solutions.length > 0) {
+        const lastSol = solveResult.solutions[solveResult.solutions.length - 1];
+        finalRemaining = {
+            numbers: { ...lastSol.remainingNums },
+            operators: { ...lastSol.remainingOps }
+        };
+    }
 
-                for (const opsArr of opPerms) {
-                    const expr = [];
-                    for (let i = 0; i < nums.length; i++) {
-                        expr.push({ value: nums[i], type: 'number' });
-                        if (i < opsArr.length) {
-                            expr.push({ value: opsArr[i], type: 'operator' });
+    const record = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        inputs: currentInputs,
+        result: {
+            success: solveResult.success,
+            maxCorrect: solveResult.maxCorrect,
+            solutionCount: solveResult.solutions ? solveResult.solutions.length : 0
+        },
+        remaining: finalRemaining,
+        delta: delta // Delta compared to FIRST record (baseline)
+    };
+
+    return record;
+}
+
+// ==================== ANALYTICS ENGINE ====================
+
+let analyticsChart = null;
+
+function generateRemainingKey(remaining) {
+    if (!remaining) return 'none';
+
+    const numParts = [];
+    for (let i = 0; i <= 9; i++) {
+        if (remaining.numbers[i] > 0) {
+            numParts.push(`${i}:${remaining.numbers[i]}`);
+        }
+    }
+
+    const opParts = [];
+    const ops = ['+', '-', '*', '/'];
+    ops.forEach(op => {
+        if (remaining.operators[op] > 0) {
+            opParts.push(`${op}:${remaining.operators[op]}`);
+        }
+    });
+
+    if (numParts.length === 0 && opParts.length === 0) {
+        return 'empty';
+    }
+
+    return `${numParts.join(',')}|${opParts.join(',')}`;
+}
+
+function groupByExactRemaining(records) {
+    const groups = new Map();
+
+    records.forEach(record => {
+        const key = generateRemainingKey(record.remaining);
+        if (!groups.has(key)) {
+            groups.set(key, []);
+        }
+        groups.get(key).push(record);
+    });
+
+    return groups;
+}
+
+function prepareChartData(records) {
+    // Filter records matching current requirements
+    const filtered = records.filter(r =>
+        r.inputs.numDigits === gameState.numDigits &&
+        r.inputs.numOperators === gameState.numOperators &&
+        r.inputs.targetResult === gameState.targetResult
+    );
+
+    // Sort by timestamp
+    filtered.sort((a, b) => a.id - b.id);
+
+    const labels = [];
+    const data = [];
+    const tooltipData = [];
+
+    filtered.forEach((record, index) => {
+        labels.push(`#${index + 1}`);
+        data.push(record.result.maxCorrect);
+
+        // Build tooltip info - delta compared to FIRST record (baseline)
+        let deltaStr = '';
+        if (index === 0) {
+            deltaStr = 'Baseline (lần đầu)';
+        } else if (record.delta) {
+            const parts = [];
+            Object.entries(record.delta.deltaNumbers || {}).forEach(([num, diff]) => {
+                parts.push(`${diff > 0 ? '+' : ''}${diff} số ${num}`);
+            });
+            Object.entries(record.delta.deltaOperators || {}).forEach(([op, diff]) => {
+                parts.push(`${diff > 0 ? '+' : ''}${diff} phép ${formatOperatorForDisplay(op)}`);
+            });
+            deltaStr = parts.length > 0 ? parts.join(', ') : 'Không đổi so với baseline';
+        } else {
+            deltaStr = 'Không đổi so với baseline';
+        }
+
+        tooltipData.push({
+            delta: deltaStr,
+            maxCorrect: record.result.maxCorrect,
+            timestamp: new Date(record.timestamp).toLocaleString('vi-VN')
+        });
+    });
+
+    return { labels, data, tooltipData, recordCount: filtered.length };
+}
+
+function renderAnalyticsChart() {
+    const canvas = document.getElementById('analytics-chart');
+    if (!canvas) return;
+
+    const records = getRecords();
+    const chartData = prepareChartData(records);
+
+    if (chartData.recordCount === 0) {
+        // Show message instead of chart
+        const container = canvas.parentElement;
+        container.innerHTML = '<div class="no-records">Chưa có dữ liệu. Hãy "Xem Cách Giải" để ghi nhận kết quả!</div>';
+        return;
+    }
+
+    // Ensure canvas exists
+    if (!document.getElementById('analytics-chart')) {
+        const container = document.getElementById('analytics-chart-container');
+        if (container) {
+            container.innerHTML = '<canvas id="analytics-chart"></canvas>';
+        }
+    }
+
+    const ctx = document.getElementById('analytics-chart');
+    if (!ctx) return;
+
+    // Destroy existing chart
+    if (analyticsChart) {
+        analyticsChart.destroy();
+    }
+
+    // Create new chart
+    analyticsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Số phép tính đúng',
+                data: chartData.data,
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                pointBackgroundColor: '#007bff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => {
+                            const idx = items[0].dataIndex;
+                            return `Lần thử ${chartData.labels[idx]}`;
+                        },
+                        label: (item) => {
+                            const idx = item.dataIndex;
+                            const info = chartData.tooltipData[idx];
+                            return [
+                                `Kết quả: ${info.maxCorrect} phép tính`,
+                                `So với baseline: ${info.delta}`,
+                                `Thời gian: ${info.timestamp}`
+                            ];
                         }
                     }
-
-                    const exprStr = expr.map(e => e.value).join(' ');
-                    if (seen.has(exprStr)) continue;
-                    seen.add(exprStr);
-
-                    const result = evaluateExpression(expr);
-
-                    if (result === gameState.targetResult) {
-                        validExpressions.push({
-                            expression: exprStr,
-                            numbers: [...nums],
-                            operators: [...opsArr]
-                        });
-
-                        if (validExpressions.length >= SOLVER_CONFIG.maxExpressions) {
-                            break outer;
-                        }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    },
+                    title: {
+                        display: true,
+                        text: 'Số phép tính đúng'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Lần thử'
                     }
                 }
             }
         }
-    }
-
-    if (validExpressions.length === 0) {
-        return { success: false, maxCorrect: 0 };
-    }
-
-    // Find maximal set
-    const bestSet = findMaximalExpressionSet(validExpressions, numbers, operators);
-
-    return {
-        success: true,
-        maxCorrect: bestSet.length
-    };
+    });
 }
 
-function displaySuggestions(result) {
-    const container = document.getElementById('suggest-result');
+function renderHistoryList() {
+    const container = document.getElementById('history-list');
     if (!container) return;
 
-    container.style.display = 'block';
-    container.innerHTML = '';
+    const records = getRecords();
 
-    const content = document.createElement('div');
-    content.className = 'suggest-result-content';
+    // Filter records matching current requirements
+    const filtered = records.filter(r =>
+        r.inputs.numDigits === gameState.numDigits &&
+        r.inputs.numOperators === gameState.numOperators &&
+        r.inputs.targetResult === gameState.targetResult
+    );
 
-    // Header with baseline
-    const header = document.createElement('div');
-    header.className = 'suggest-header';
-    header.innerHTML = `📊 Kết quả hiện tại: <strong>${result.baseline}</strong> phép tính đúng`;
-    content.appendChild(header);
+    // Sort by timestamp descending, take last 10
+    filtered.sort((a, b) => b.id - a.id);
+    const recent = filtered.slice(0, 10);
 
-    if (result.suggestions.length === 0) {
-        const noResult = document.createElement('div');
-        noResult.className = 'suggest-no-improvement';
-        noResult.innerHTML = result.message;
-        content.appendChild(noResult);
-    } else {
-        const sugList = document.createElement('div');
-
-        result.suggestions.forEach((sug, index) => {
-            const item = document.createElement('div');
-            item.className = 'suggest-item';
-
-            // Build add chips
-            let addHtml = '<div class="suggest-add">';
-
-            if (sug.addedNumbers.length > 0) {
-                addHtml += '<span>Thêm số: </span>';
-                sug.addedNumbers.forEach(n => {
-                    addHtml += `<span class="suggest-chip num">${n}</span>`;
-                });
-            }
-
-            if (sug.addedOperators.length > 0) {
-                addHtml += '<span style="margin-left: 10px;">Thêm phép: </span>';
-                sug.addedOperators.forEach(op => {
-                    addHtml += `<span class="suggest-chip op">${formatOperatorForDisplay(op)}</span>`;
-                });
-            }
-
-            addHtml += '</div>';
-
-            item.innerHTML = `
-                <span class="solution-index">${index + 1}.</span>
-                ${addHtml}
-                <span class="suggest-improvement">→ ${sug.resultCount} phép tính (+${sug.improvement})</span>
-            `;
-            sugList.appendChild(item);
-        });
-
-        content.appendChild(sugList);
+    if (recent.length === 0) {
+        container.innerHTML = '<div class="no-records">Chưa có lịch sử cho yêu cầu hiện tại.</div>';
+        return;
     }
 
-    container.appendChild(content);
+    container.innerHTML = '';
+
+    recent.forEach((record, index) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+
+        // Get record's position in the full filtered list (for determining if it's baseline)
+        const recordPosition = filtered.length - index;
+        const isBaseline = recordPosition === 1;
+
+        // Build delta display - compared to FIRST record (baseline)
+        let deltaHtml = '';
+        if (isBaseline) {
+            deltaHtml = '<span class="delta-first">Baseline</span>';
+        } else if (record.delta) {
+            const chips = [];
+            Object.entries(record.delta.deltaNumbers || {}).forEach(([num, diff]) => {
+                const sign = diff > 0 ? '+' : '';
+                chips.push(`<span class="delta-chip num">${sign}${diff} số ${num}</span>`);
+            });
+            Object.entries(record.delta.deltaOperators || {}).forEach(([op, diff]) => {
+                const sign = diff > 0 ? '+' : '';
+                chips.push(`<span class="delta-chip op">${sign}${diff} ${formatOperatorForDisplay(op)}</span>`);
+            });
+            deltaHtml = chips.length > 0 ? chips.join(' ') : '<span class="delta-none">Không đổi</span>';
+        } else {
+            deltaHtml = '<span class="delta-none">Không đổi</span>';
+        }
+
+        item.innerHTML = `
+            <div class="history-main">
+                <span class="history-index">#${recordPosition}</span>
+                <span class="history-result">${record.result.maxCorrect} phép tính</span>
+                <span class="history-delta">Δ: ${deltaHtml}</span>
+            </div>
+        `;
+
+        container.appendChild(item);
+    });
 }
 
 // ==================== FEEDBACK ====================
@@ -792,11 +1003,16 @@ function showFeedback(message, type) {
 
 // ==================== BUTTON HANDLERS ====================
 
+let autoRecord = false;
+
 function setupButtons() {
     const btnReset = document.getElementById('btnMathReset');
     const btnSolve = document.getElementById('btnMathSolve');
     const btnExample = document.getElementById('btnMathExample');
-    const btnSuggest = document.getElementById('btnMathSuggest');
+    const btnSave = document.getElementById('btnMathSave');
+    const btnLoad = document.getElementById('btnMathLoad');
+    const btnAnalytics = document.getElementById('btnAnalytics');
+    const btnClearHistory = document.getElementById('btnClearHistory');
 
     if (btnReset) {
         btnReset.addEventListener('click', resetGame);
@@ -814,6 +1030,19 @@ function setupButtons() {
                 const result = await solvePuzzle();
                 lastSolveResult = result;
                 displaySolutions(result);
+
+                // Auto-record if enabled
+                if (autoRecord && result.success) {
+                    const record = createRecord(result);
+                    saveRecord(record);
+
+                    // Update analytics if visible
+                    const analyticsSection = document.getElementById('analytics-section');
+                    if (analyticsSection && analyticsSection.style.display !== 'none') {
+                        renderAnalyticsChart();
+                        renderHistoryList();
+                    }
+                }
             } catch (error) {
                 console.error('Solver error:', error);
                 showFeedback('Có lỗi xảy ra khi giải!', 'error');
@@ -828,23 +1057,29 @@ function setupButtons() {
         btnExample.addEventListener('click', loadExample);
     }
 
-    if (btnSuggest) {
-        btnSuggest.addEventListener('click', async () => {
-            btnSuggest.disabled = true;
-            btnSuggest.textContent = 'Đang tính...';
+    // Save/Load handlers
+    if (btnSave) {
+        btnSave.addEventListener('click', saveCurrentState);
+    }
 
-            await new Promise(resolve => setTimeout(resolve, 10));
+    if (btnLoad) {
+        btnLoad.addEventListener('click', loadSavedState);
+    }
 
-            try {
-                const extraTotal = parseInt(document.getElementById('suggest-extra-total').value) || 1;
-                const result = await suggestBestAdditions(extraTotal);
-                displaySuggestions(result);
-            } catch (error) {
-                console.error('Suggest error:', error);
-                showFeedback('Có lỗi xảy ra khi tính gợi ý!', 'error');
-            } finally {
-                btnSuggest.disabled = false;
-                btnSuggest.textContent = 'Gợi Ý';
+    // Analytics handlers
+    if (btnAnalytics) {
+        btnAnalytics.addEventListener('click', () => {
+            renderAnalyticsChart();
+            renderHistoryList();
+        });
+    }
+
+    if (btnClearHistory) {
+        btnClearHistory.addEventListener('click', () => {
+            if (confirm('Bạn có chắc muốn xóa toàn bộ lịch sử?')) {
+                clearRecords();
+                renderAnalyticsChart();
+                renderHistoryList();
             }
         });
     }
