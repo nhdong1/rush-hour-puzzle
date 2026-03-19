@@ -1,0 +1,315 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from PIL import ImageGrab, ImageTk, Image
+import cv2
+import numpy as np
+import os
+
+
+PIECE_TEMPLATES = [
+    "mouse_blue", "cat_blue", "dog_blue", "fox_blue",
+    "wolf_blue", "tiger_blue", "lion_blue", "elephant_blue",
+    "mouse_red", "cat_red", "dog_red", "fox_red",
+    "wolf_red", "tiger_red", "lion_red", "elephant_red",
+    "unflipped",
+]
+
+ALL_TEMPLATES = PIECE_TEMPLATES
+
+
+class TemplateCaptureDialog:
+    """
+    Dialog for capturing and saving templates for pieces and buttons.
+    Uses fullscreen overlay with region selection.
+    """
+
+    def __init__(self, parent, templates_path: str, callback=None):
+        self.parent = parent
+        self.templates_path = templates_path
+        self.callback = callback
+
+        self.captured_region = None
+        self.captured_image = None
+
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Chụp Template")
+        self.dialog.geometry("500x400")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+
+        self._setup_ui()
+
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() - 500) // 2
+        y = (self.dialog.winfo_screenheight() - 400) // 2
+        self.dialog.geometry(f"+{x}+{y}")
+
+    def _setup_ui(self):
+        main_frame = ttk.Frame(self.dialog, padding="15")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        type_frame = ttk.LabelFrame(main_frame, text="Chọn loại template", padding="10")
+        type_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(type_frame, text="Template:").pack(side=tk.LEFT)
+
+        self.template_var = tk.StringVar(value=ALL_TEMPLATES[0])
+        self.template_combo = ttk.Combobox(
+            type_frame,
+            textvariable=self.template_var,
+            values=ALL_TEMPLATES,
+            state="readonly",
+            width=25
+        )
+        self.template_combo.pack(side=tk.LEFT, padx=10)
+        self.template_combo.bind("<<ComboboxSelected>>", self._on_template_selected)
+
+        self.type_label = ttk.Label(type_frame, text="")
+        self.type_label.pack(side=tk.LEFT, padx=5)
+        self._update_type_label()
+
+        capture_frame = ttk.Frame(main_frame)
+        capture_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.capture_btn = ttk.Button(
+            capture_frame,
+            text="📷 Chụp vùng màn hình",
+            command=self._start_capture
+        )
+        self.capture_btn.pack(side=tk.LEFT)
+
+        self.status_label = ttk.Label(capture_frame, text="Chưa chụp", foreground="gray")
+        self.status_label.pack(side=tk.LEFT, padx=10)
+
+        preview_frame = ttk.LabelFrame(main_frame, text="Xem trước", padding="10")
+        preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        self.preview_canvas = tk.Canvas(preview_frame, bg="gray", width=200, height=150)
+        self.preview_canvas.pack(fill=tk.BOTH, expand=True)
+
+        self.preview_image = None
+
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=tk.X)
+
+        self.save_btn = ttk.Button(
+            btn_frame,
+            text="💾 Lưu Template",
+            command=self._save_template,
+            state=tk.DISABLED
+        )
+        self.save_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        ttk.Button(
+            btn_frame,
+            text="Đóng",
+            command=self.dialog.destroy
+        ).pack(side=tk.RIGHT)
+
+        info_text = "Hướng dẫn: Chọn loại template → Nhấn 'Chụp vùng màn hình' → Kéo chọn vùng → Lưu"
+        ttk.Label(
+            main_frame,
+            text=info_text,
+            foreground="gray",
+            wraplength=450
+        ).pack(pady=(10, 0))
+
+    def _on_template_selected(self, event=None):
+        self._update_type_label()
+
+    def _update_type_label(self):
+        template_name = self.template_var.get()
+        if template_name in PIECE_TEMPLATES:
+            if "blue" in template_name:
+                self.type_label.config(text="(Quân xanh)", foreground="blue")
+            elif "red" in template_name:
+                self.type_label.config(text="(Quân đỏ)", foreground="red")
+            else:
+                self.type_label.config(text="(Ô chưa lật)", foreground="gray")
+        else:
+            self.type_label.config(text="(Nút bấm)", foreground="green")
+
+    def _start_capture(self):
+        self.dialog.grab_release()
+        self.dialog.withdraw()
+        self.parent.after(300, self._open_capture_overlay)
+
+    def _open_capture_overlay(self):
+        CaptureOverlay(self._on_region_captured)
+
+    def _on_region_captured(self, image, region):
+        try:
+            if not self.dialog.winfo_exists():
+                return
+            self.dialog.deiconify()
+            self.dialog.grab_set()
+        except tk.TclError:
+            return
+
+        if image is None:
+            self.status_label.config(text="Đã hủy", foreground="orange")
+            return
+
+        self.captured_image = image
+        self.captured_region = region
+
+        self._update_preview(image)
+
+        self.save_btn.config(state=tk.NORMAL)
+        self.status_label.config(
+            text=f"Đã chụp: {image.width}x{image.height}px",
+            foreground="green"
+        )
+
+    def _update_preview(self, image):
+        canvas_width = self.preview_canvas.winfo_width()
+        canvas_height = self.preview_canvas.winfo_height()
+
+        if canvas_width < 50:
+            canvas_width = 200
+        if canvas_height < 50:
+            canvas_height = 150
+
+        scale_x = canvas_width / image.width
+        scale_y = canvas_height / image.height
+        scale = min(scale_x, scale_y, 1.0)
+
+        new_width = int(image.width * scale)
+        new_height = int(image.height * scale)
+
+        if new_width < 1:
+            new_width = 1
+        if new_height < 1:
+            new_height = 1
+
+        resized = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        self.preview_image = ImageTk.PhotoImage(resized)
+
+        self.preview_canvas.delete("all")
+        self.preview_canvas.create_image(
+            canvas_width // 2,
+            canvas_height // 2,
+            image=self.preview_image,
+            anchor=tk.CENTER
+        )
+
+    def _save_template(self):
+        if self.captured_image is None:
+            messagebox.showerror("Lỗi", "Chưa chụp template!")
+            return
+
+        template_name = self.template_var.get()
+
+        os.makedirs(self.templates_path, exist_ok=True)
+
+        filepath = os.path.join(self.templates_path, f"{template_name}.png")
+
+        cv_image = cv2.cvtColor(np.array(self.captured_image), cv2.COLOR_RGB2BGR)
+        cv2.imwrite(filepath, cv_image)
+
+        messagebox.showinfo("Thành công", f"Đã lưu template: {template_name}.png")
+
+        self.captured_image = None
+        self.captured_region = None
+        self.save_btn.config(state=tk.DISABLED)
+        self.status_label.config(text="Đã lưu!", foreground="blue")
+        self.preview_canvas.delete("all")
+
+        if self.callback:
+            self.callback(template_name)
+
+
+class CaptureOverlay:
+    def __init__(self, callback):
+        self.callback = callback
+        self.start_x = None
+        self.start_y = None
+        self.rect_id = None
+
+        self.screenshot = ImageGrab.grab()
+
+        self.root = tk.Toplevel()
+        self.root.attributes('-fullscreen', True)
+        self.root.attributes('-topmost', True)
+        self.root.configure(cursor="cross")
+
+        self.screenshot_tk = ImageTk.PhotoImage(self.screenshot)
+
+        self.canvas = tk.Canvas(
+            self.root,
+            highlightthickness=0,
+            cursor="cross"
+        )
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        self.canvas.create_image(0, 0, image=self.screenshot_tk, anchor=tk.NW)
+
+        self.canvas.create_rectangle(
+            0, 0,
+            self.root.winfo_screenwidth(),
+            self.root.winfo_screenheight(),
+            fill="black",
+            stipple="gray50",
+            outline=""
+        )
+
+        self.canvas.create_text(
+            self.root.winfo_screenwidth() // 2,
+            30,
+            text="Kéo để chọn vùng template. Nhấn ESC để hủy.",
+            fill="white",
+            font=("Arial", 16, "bold")
+        )
+
+        self.canvas.bind("<ButtonPress-1>", self._on_press)
+        self.canvas.bind("<B1-Motion>", self._on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        self.root.bind("<Escape>", self._on_cancel)
+
+        self.root.focus_force()
+
+    def _on_press(self, event):
+        self.start_x = event.x
+        self.start_y = event.y
+
+        if self.rect_id:
+            self.canvas.delete(self.rect_id)
+
+        self.rect_id = self.canvas.create_rectangle(
+            self.start_x, self.start_y,
+            self.start_x, self.start_y,
+            outline="red",
+            width=2
+        )
+
+    def _on_drag(self, event):
+        if self.rect_id:
+            self.canvas.coords(
+                self.rect_id,
+                self.start_x, self.start_y,
+                event.x, event.y
+            )
+
+    def _on_release(self, event):
+        end_x = event.x
+        end_y = event.y
+
+        self.root.destroy()
+
+        if self.start_x is not None and self.start_y is not None:
+            if abs(end_x - self.start_x) > 10 and abs(end_y - self.start_y) > 10:
+                x1 = min(self.start_x, end_x)
+                y1 = min(self.start_y, end_y)
+                x2 = max(self.start_x, end_x)
+                y2 = max(self.start_y, end_y)
+
+                cropped = self.screenshot.crop((x1, y1, x2, y2))
+                self.callback(cropped, (x1, y1, x2, y2))
+            else:
+                self.callback(None, None)
+        else:
+            self.callback(None, None)
+
+    def _on_cancel(self, event):
+        self.root.destroy()
+        self.callback(None, None)
