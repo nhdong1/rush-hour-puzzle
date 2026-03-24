@@ -182,7 +182,7 @@ class AIPlayer:
                               cell_states: List[List[CellInfo]]) -> Tuple[int, float]:
         """
         Calculate priority for an action optimized for MAXIMUM SCORE.
-        
+
         Priority order (score-focused):
         Priority 1 (highest): High-value captures (power >= 5: Elephant, Lion, Tiger)
         Priority 2: Blue mouse captures red elephant (8 points!)
@@ -198,34 +198,36 @@ class AIPlayer:
         # Priority 1: High-value captures (Elephant=8, Lion=7, Tiger=6)
         if action.type == ActionType.CAPTURE:
             capture_value = action.target_piece.power
-            
+
             # Mouse capturing elephant is the BEST (8 points, no risk)
             if action.piece.type == "mouse" and action.target_piece.type == "elephant":
                 return (1, capture_value * CAPTURE_VALUE_WEIGHT + 100)
-            
+
             # High-value targets (power >= 5)
             if capture_value >= HIGH_VALUE_THRESHOLD:
                 # Bonus for safe captures, but still prioritize high value even if risky
                 safety_bonus = 50 if not self._will_be_captured_after(action, board_state, cell_states) else 0
                 return (1, capture_value * CAPTURE_VALUE_WEIGHT + safety_bonus)
-            
+
             # Medium-value captures (power 3-4)
             if capture_value >= 3:
                 safety_bonus = 30 if not self._will_be_captured_after(action, board_state, cell_states) else 0
                 return (2, capture_value * CAPTURE_VALUE_WEIGHT + safety_bonus)
-            
+
             # Low-value captures (power 1-2) - still worth taking!
             return (3, capture_value * CAPTURE_VALUE_WEIGHT)
 
         # Priority 4: Aggressive moves towards high-value targets
         if action.type == ActionType.MOVE:
             dst_row, dst_col = action.target_pos
-            
-            # Calculate how close this move gets us to high-value targets
-            hunt_score = self._calculate_hunt_score(action.piece, dst_row, dst_col, board_state)
+
+            # Calculate how close this move gets us to high-value targets (with cornering)
+            hunt_score = self._calculate_hunt_score(
+                action.piece, dst_row, dst_col, board_state, cell_states
+            )
             if hunt_score > 0:
                 return (4, hunt_score)
-            
+
             # Blue elephant escaping mouse - preserve our high-value piece for later captures
             if action.piece.type == "elephant":
                 src_row, src_col = action.source_pos
@@ -244,28 +246,96 @@ class AIPlayer:
 
         # Priority 8: Other moves
         return (8, 0.0)
-    
+
     def _will_be_captured_after(self, action: Action,
                                  board_state: List[List[Optional[Piece]]],
                                  cell_states: List[List[CellInfo]]) -> bool:
         """Check if our piece will be captured after this action"""
         if action.type == ActionType.FLIP:
             return False
-        
+
         new_board, new_cells, _ = self._simulate_action(action, board_state, cell_states)
         target_pos = action.target_pos
-        
+
         our_piece = new_board[target_pos[0]][target_pos[1]]
         if our_piece is None:
             return False
-        
+
         return self._is_threatened_by_red(target_pos, our_piece, new_board, new_cells)
-    
+
+    def _count_red_escape_routes(self, red_piece: Piece,
+                                   board_state: List[List[Optional[Piece]]],
+                                   cell_states: List[List[CellInfo]]) -> int:
+        """
+        Count the number of valid escape routes for a red piece.
+        An escape route is an adjacent empty cell that the red piece can move to.
+        Returns 0-4 (max 4 directions).
+        """
+        escape_count = 0
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        for dr, dc in directions:
+            nr, nc = red_piece.row + dr, red_piece.col + dc
+
+            if not self._is_valid_pos(nr, nc):
+                continue
+
+            # Check if cell is flipped and empty
+            if cell_states[nr][nc].state == CellState.UNFLIPPED:
+                continue
+
+            target = board_state[nr][nc]
+            if target is None:
+                escape_count += 1
+            elif target.is_blue:
+                # Red can escape by capturing blue piece if power allows
+                if self.can_capture(red_piece, target):
+                    escape_count += 1
+
+        return escape_count
+
+    def _simulate_escape_routes_after_move(self, blue_piece: Piece,
+                                            new_row: int, new_col: int,
+                                            red_piece: Piece,
+                                            board_state: List[List[Optional[Piece]]],
+                                            cell_states: List[List[CellInfo]]) -> int:
+        """
+        Simulate escape routes for red piece AFTER blue piece moves to (new_row, new_col).
+        """
+        # Create simulated board
+        sim_board = [row[:] for row in board_state]
+
+        # Move blue piece
+        old_row, old_col = blue_piece.row, blue_piece.col
+        sim_board[old_row][old_col] = None
+
+        moved_blue = Piece(
+            type=blue_piece.type,
+            is_blue=True,
+            power=blue_piece.power,
+            row=new_row,
+            col=new_col,
+            confidence=blue_piece.confidence
+        )
+        sim_board[new_row][new_col] = moved_blue
+
+        return self._count_red_escape_routes(red_piece, sim_board, cell_states)
+
     def _calculate_hunt_score(self, piece: Piece, row: int, col: int,
-                               board_state: List[List[Optional[Piece]]]) -> float:
-        """Calculate score for hunting high-value targets"""
+                               board_state: List[List[Optional[Piece]]],
+                               cell_states: List[List[CellInfo]] = None) -> float:
+        """
+        Calculate score for hunting high-value targets.
+
+        Prioritizes moves that:
+        1. Get closer to capturable targets
+        2. REDUCE enemy escape routes (cornering)
+        3. Trap enemy in corners (0 escape routes = massive bonus)
+
+        Reduces priority if enemy still has many escape routes.
+        """
         hunt_score = 0.0
-        
+
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
                 target = board_state[r][c]
@@ -274,17 +344,53 @@ class AIPlayer:
                     if self.can_capture(piece, target):
                         old_dist = abs(piece.row - r) + abs(piece.col - c)
                         new_dist = abs(row - r) + abs(col - c)
-                        
+
                         # Moving closer to a capturable target
                         if new_dist < old_dist:
                             # Higher value targets = higher hunt score
                             value_multiplier = target.power * 5
-                            hunt_score += value_multiplier * (old_dist - new_dist)
-                            
+                            base_hunt_score = value_multiplier * (old_dist - new_dist)
+
+                            # === CORNERING LOGIC ===
+                            if cell_states is not None:
+                                # Count current escape routes
+                                current_escapes = self._count_red_escape_routes(
+                                    target, board_state, cell_states
+                                )
+
+                                # Count escape routes AFTER our move
+                                escapes_after = self._simulate_escape_routes_after_move(
+                                    piece, row, col, target, board_state, cell_states
+                                )
+
+                                # Bonus for reducing escape routes
+                                escape_reduction = current_escapes - escapes_after
+                                if escape_reduction > 0:
+                                    # Good! We're trapping them
+                                    cornering_bonus = escape_reduction * target.power * 10
+                                    base_hunt_score += cornering_bonus
+
+                                    # MASSIVE bonus for completely trapping (0 escapes)
+                                    if escapes_after == 0:
+                                        base_hunt_score += target.power * 50
+                                    # Big bonus for leaving only 1 escape
+                                    elif escapes_after == 1:
+                                        base_hunt_score += target.power * 25
+
+                                # REDUCE priority if enemy still has many routes
+                                elif escapes_after >= 3:
+                                    # Red has plenty of escape options - less urgent
+                                    base_hunt_score *= 0.5
+                                elif escapes_after == 2 and escape_reduction <= 0:
+                                    # No improvement in cornering
+                                    base_hunt_score *= 0.7
+
+                            hunt_score += base_hunt_score
+
                             # Extra bonus for getting adjacent to high-value targets
                             if new_dist == 1 and target.power >= HIGH_VALUE_THRESHOLD:
                                 hunt_score += target.power * 20
-        
+
         return hunt_score
 
     def _is_threatened_by_mouse(self, row: int, col: int,
@@ -330,7 +436,7 @@ class AIPlayer:
                            cell_states: List[List[CellInfo]]) -> Optional[Action]:
         """
         Select the best action optimized for MAXIMUM SCORE.
-        
+
         Strategy:
         - Prioritize ALL captures (points are points!)
         - High-value captures get massive priority
@@ -345,10 +451,10 @@ class AIPlayer:
         for action in valid_actions:
             priority, sub_score = self._get_action_priority(action, board_state, cell_states)
             is_safe = self._is_safe_action(action, board_state, cell_states)
-            
+
             # For score maximization: calculate net value even for risky captures
             net_value = self._calculate_net_capture_value(action, board_state, cell_states)
-            
+
             action_priorities.append((action, priority, sub_score, is_safe, net_value))
 
         # Sort by priority first, then by sub_score (captures sorted by value)
@@ -362,7 +468,7 @@ class AIPlayer:
             capture_actions = [ap for ap in action_priorities if ap[1] <= 3]
             # Sort by net value (reward - risk), then by raw capture value
             capture_actions.sort(key=lambda x: (-x[4], -x[2]))
-            
+
             best_capture = capture_actions[0]
             # Take the capture if net value is positive OR if it's a high-value target
             if best_capture[4] >= 0 or best_capture[0].target_piece.power >= HIGH_VALUE_THRESHOLD:
@@ -396,14 +502,14 @@ class AIPlayer:
                 alpha=alpha, beta=beta,
                 is_blue_turn=False
             )
-            
+
             # Heavily weight the immediate score gain
             score += score_change * CAPTURE_VALUE_WEIGHT
 
             # Add priority bonus (lower priority number = higher bonus)
             priority_bonus = (9 - priority) * 15
             score += priority_bonus + sub_score
-            
+
             # Add net value bonus for captures
             if action.type == ActionType.CAPTURE:
                 score += net_value * 10
@@ -415,7 +521,7 @@ class AIPlayer:
             alpha = max(alpha, score)
 
         return best_action
-    
+
     def _calculate_net_capture_value(self, action: Action,
                                       board_state: List[List[Optional[Piece]]],
                                       cell_states: List[List[CellInfo]]) -> float:
@@ -425,24 +531,24 @@ class AIPlayer:
         """
         if action.type != ActionType.CAPTURE:
             return 0.0
-        
+
         reward = action.target_piece.power
-        
+
         # Check if we'll lose our piece after the capture
         new_board, new_cells, _ = self._simulate_action(action, board_state, cell_states)
         our_piece = new_board[action.target_pos[0]][action.target_pos[1]]
-        
+
         if our_piece is None:
             # Equal power trade - we both die, but we got points!
             return reward  # For score maximization, this is POSITIVE
-        
+
         if self._is_threatened_by_red(action.target_pos, our_piece, new_board, new_cells):
             # We might lose our piece - but we still got the capture points
             # Net = what we gain - what we might lose
             potential_loss = our_piece.power
             # For score max: even trades are good (we gain points)
             return reward - (potential_loss * 0.5)  # Discount potential loss
-        
+
         # Safe capture - full value
         return reward
 
@@ -633,7 +739,7 @@ class AIPlayer:
                         cell_states: List[List[CellInfo]]) -> float:
         """
         Evaluate board state optimized for MAXIMUM SCORE accumulation.
-        
+
         Key principles:
         - Heavily reward positions that enable captures
         - Value remaining enemy pieces as "potential points"
@@ -655,25 +761,25 @@ class AIPlayer:
                         red_pieces.append(piece)
 
         # === SCORE MAXIMIZATION EVALUATION ===
-        
+
         # 1. Potential points remaining (enemy pieces = future points)
         potential_points = sum(p.power for p in red_pieces)
         score += potential_points * 3  # We WANT enemies alive to capture them
-        
+
         # 2. Our capturing power (blue pieces that can capture)
         blue_power = sum(p.power for p in blue_pieces)
         score += blue_power * MATERIAL_DIFF_WEIGHT
-        
+
         # 3. Piece count - we need pieces to capture with
         score += len(blue_pieces) * PIECE_COUNT_WEIGHT
-        
+
         # 4. IMMEDIATE CAPTURE OPPORTUNITIES (highest priority!)
         for blue in blue_pieces:
             for red in red_pieces:
                 if self._is_adjacent(blue, red) and self.can_capture(blue, red):
                     # Immediate capture available - HUGE bonus
                     score += red.power * CAPTURE_VALUE_WEIGHT
-                    
+
                     # Extra bonus for high-value targets
                     if red.power >= HIGH_VALUE_THRESHOLD:
                         score += red.power * 20
